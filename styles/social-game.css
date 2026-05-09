@@ -1,0 +1,21 @@
+.social-game {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.social-game section {
+  border: 1px solid #666;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.social-game input {
+  width: 100%;
+  margin-bottom: 0.4rem;
+}
+
+.room-card {
+  border-top: 1px dashed #777;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+}

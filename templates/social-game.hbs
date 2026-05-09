@@ -1,0 +1,42 @@
+<div class="social-game">
+  <section>
+    <h3>Usuario: {{userName}}</h3>
+    <button type="button" data-action="create-room">Crear sala</button>
+  </section>
+
+  <section>
+    <input type="text" name="room-id" placeholder="ID de sala" />
+    <button type="button" data-action="join-room">Unirse</button>
+    <p>Sala actual: <strong>{{roomId}}</strong></p>
+  </section>
+
+  <section>
+    <h4>Crear votación</h4>
+    <input type="text" name="question" placeholder="Pregunta" />
+    <input type="text" name="option-a" placeholder="Opción A" />
+    <input type="text" name="option-b" placeholder="Opción B" />
+    <button type="button" data-action="start-poll">Iniciar votación</button>
+    <button type="button" data-action="close-poll">Cerrar votación</button>
+  </section>
+
+  <section>
+    <h4>Salas</h4>
+    {{#if rooms.length}}
+      {{#each rooms}}
+        <article class="room-card">
+          <header>
+            <strong>{{id}}</strong> · Host: {{hostName}} · Participantes: {{participantCount}}
+          </header>
+          {{#if activePoll}}
+            <p>{{activePoll.question}}</p>
+            <button type="button" data-action="vote" data-option="0">{{activePoll.options.[0]}}</button>
+            <button type="button" data-action="vote" data-option="1">{{activePoll.options.[1]}}</button>
+            <p>Estado: {{#if activePoll.open}}Abierta{{else}}Cerrada{{/if}}</p>
+          {{/if}}
+        </article>
+      {{/each}}
+    {{else}}
+      <p>No hay salas todavía.</p>
+    {{/if}}
+  </section>
+</div>

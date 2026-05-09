@@ -1,0 +1,21 @@
+{
+  "id": "test-01",
+  "title": "Test 01 Social Room",
+  "description": "MVP de salas y votaciones para Foundry VTT.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "13"
+  },
+  "authors": [
+    {
+      "name": "test-01"
+    }
+  ],
+  "esmodules": [
+    "scripts/social-game.js"
+  ],
+  "styles": [
+    "styles/social-game.css"
+  ]
+}
