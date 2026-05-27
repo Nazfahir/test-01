@@ -32,6 +32,18 @@ export default async function LobbyPage({ params }: { params: Promise<{ roomCode
     authUser.user?.id ? p.user_id === authUser.user.id : guestSessionId ? p.guest_session_id === guestSessionId : false,
   );
 
+  if (!currentParticipant) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
+        <h1 className="text-2xl font-bold text-primary">Acceso restringido</h1>
+        <p className="text-sm text-gray-600">Esta sala solo es visible para participantes activos. Únete con un código o link válido.</p>
+        <Link className="text-sm font-medium text-primary underline" href="/rooms/join">
+          Ir a unirme a sala
+        </Link>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold text-primary">Lobby de sala</h1>

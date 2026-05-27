@@ -107,7 +107,6 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           {isHost ? (
             <form action={modeAction} className="flex gap-2">
               <input type="hidden" name="roomId" value={state.room.id} />
-              <input type="hidden" name="participantId" value={currentParticipantId ?? ''} />
               <button className="rounded border px-3 py-1 text-sm" type="submit" name="selectedMode" value="soft" disabled={modePending || state.room.status !== 'lobby'}>Suave</button>
               <button className="rounded border px-3 py-1 text-sm" type="submit" name="selectedMode" value="party" disabled={modePending || state.room.status !== 'lobby'}>Fiesta</button>
             </form>
@@ -138,7 +137,6 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           <form action={startAction}>
             <input type="hidden" name="roomId" value={state.room.id} />
             <input type="hidden" name="roomCode" value={roomCode} />
-            <input type="hidden" name="participantId" value={currentParticipantId ?? ''} />
             <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={!startStatus.canStart || startPending}>
               {startPending ? 'Iniciando…' : 'Iniciar partida'}
             </button>
