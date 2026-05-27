@@ -1,3 +1,5 @@
+import { canStartMatch } from '@/features/rooms/rules';
+
 export type ConnectionStatus = 'connected' | 'disconnected' | 'left';
 
 export type LobbyParticipant = {
@@ -36,4 +38,25 @@ export function mergeParticipantEvent(state: LobbyState, incoming: LobbyParticip
 export function deriveConnectionStatus(participant: LobbyParticipant): ConnectionStatus {
   if (participant.left_at) return 'left';
   return participant.connection_status;
+}
+
+export function getActiveParticipants(participants: LobbyParticipant[]): LobbyParticipant[] {
+  return participants.filter((participant) => !participant.left_at);
+}
+
+export function getLobbyStartStatus(room: LobbyRoom, participants: LobbyParticipant[]): { canStart: boolean; reason: string } {
+  const activeCount = getActiveParticipants(participants).length;
+  const canStart = canStartMatch({
+    roomStatus: room.status as 'lobby' | 'in_game' | 'results' | 'closed' | 'expired',
+    activeParticipantsCount: activeCount,
+    minPlayers: room.min_players,
+    maxPlayers: room.max_players,
+    selectedMode: room.selected_mode,
+  });
+
+  if (canStart) return { canStart: true, reason: '✅ Todo listo para iniciar.' };
+  if (room.status !== 'lobby') return { canStart: false, reason: 'La sala ya no está en lobby.' };
+  if (!room.selected_mode) return { canStart: false, reason: 'Elige modo Suave o Fiesta para habilitar inicio.' };
+  if (activeCount < room.min_players) return { canStart: false, reason: `Faltan ${room.min_players - activeCount} jugador(es) para iniciar.` };
+  return { canStart: false, reason: `Hay demasiados jugadores activos (${activeCount}/${room.max_players}).` };
 }

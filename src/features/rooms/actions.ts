@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { getSupabaseServerClient, getSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 import { ensureGuestSessionCookie, getGuestSessionIdFromCookie } from '@/features/guests/session';
 import { generateRoomCode } from '@/features/rooms/room-code';
-import { validateJoinRoom, type JoinRoomValidationError, type RoomStatus } from '@/features/rooms/rules';
+import { canSelectMode, validateJoinRoom, type JoinRoomValidationError, type RoomStatus } from '@/features/rooms/rules';
 
 type RoomsActionState = { error?: string };
 
@@ -160,5 +160,49 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
     redirect(`/rooms/${room!.room_code}/lobby`);
   } catch {
     return { error: 'Tuvimos un problema de conexión. Vuelve a intentarlo en un momento.' };
+  }
+}
+
+
+type UpdateModeActionState = { ok?: true; error?: string };
+
+export async function updateSelectedModeAction(_: UpdateModeActionState, formData: FormData): Promise<UpdateModeActionState> {
+  try {
+    const roomId = String(formData.get('roomId') ?? '');
+    const participantId = String(formData.get('participantId') ?? '');
+    const selectedMode = String(formData.get('selectedMode') ?? '');
+
+    if (!roomId || !participantId || !selectedMode) return { error: 'No pudimos actualizar el modo. Falta información de la sala.' };
+    if (!canSelectMode({ roomStatus: 'lobby', isHost: true, selectedMode })) {
+      return { error: 'Modo inválido. Elige Suave o Fiesta.' };
+    }
+
+    const supabase = getSupabaseServiceRoleClient();
+
+    const { data: room } = await supabase
+      .from('rooms')
+      .select('status, host_participant_id')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (!room) return { error: 'No encontramos la sala para actualizar el modo.' };
+
+    const isHost = room.host_participant_id === participantId;
+    if (!canSelectMode({ roomStatus: room.status as RoomStatus, isHost, selectedMode })) {
+      return { error: isHost ? 'La sala ya cambió de estado. Vuelve al lobby para continuar.' : 'Solo el host puede cambiar el modo.' };
+    }
+
+    const { error } = await supabase
+      .from('rooms')
+      .update({ selected_mode: selectedMode })
+      .eq('id', roomId)
+      .eq('host_participant_id', participantId)
+      .eq('status', 'lobby');
+
+    if (error) return { error: 'No pudimos guardar el modo. Intenta nuevamente.' };
+
+    return { ok: true };
+  } catch {
+    return { error: 'Tuvimos un problema al actualizar el modo. Reintenta en unos segundos.' };
   }
 }
