@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from '@/components/ui/PlaceholderScreen';
+import { JoinRoomGuestForm } from '@/features/guests/join-room-guest-form';
 
 export default function JoinRoomPage() {
-  return <PlaceholderScreen title="Unirse a sala" description="Entrar por código o link (placeholder)" />;
+  return <JoinRoomGuestForm />;
 }
