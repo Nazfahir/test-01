@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
-import { deriveConnectionStatus, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
+import { updateSelectedModeAction } from '@/features/rooms/actions';
+import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
 
 type Props = {
   roomCode: string;
@@ -16,6 +17,7 @@ type Props = {
 export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initialParticipants, currentParticipantId }: Props) {
   const [state, setState] = useState<LobbyState>({ room: initialRoom, participants: normalizeParticipants(initialParticipants) });
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+  const [modeState, modeAction, modePending] = useActionState(updateSelectedModeAction, {});
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -75,18 +77,37 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
     };
   }, [currentParticipantId, initialRoom.id]);
 
-  const activeParticipants = useMemo(() => state.participants.filter((p) => !p.left_at), [state.participants]);
-  const canStart = activeParticipants.length >= state.room.min_players && activeParticipants.length <= state.room.max_players;
+  const activeParticipants = useMemo(() => getActiveParticipants(state.participants), [state.participants]);
+  const isHost = Boolean(currentParticipantId && currentParticipantId === state.room.host_participant_id);
+  const startStatus = useMemo(() => getLobbyStartStatus(state.room, state.participants), [state.room, state.participants]);
 
   return (
     <>
       <Card>
         <div className="space-y-2 text-sm text-gray-700">
           <p>Código: <strong>{roomCode}</strong></p>
-          <p>Participantes: {activeParticipants.length} / {state.room.max_players} (mínimo {state.room.min_players})</p>
-          <p className="font-medium">{canStart ? '✅ Se puede iniciar cuando quieran.' : `⏳ Faltan ${Math.max(state.room.min_players - activeParticipants.length, 0)} jugador(es).`}</p>
+          <p>Participantes activos: {activeParticipants.length} / {state.room.max_players} (mínimo {state.room.min_players})</p>
+          <p className="font-medium">{startStatus.reason}</p>
           <p className="break-all">Link de invitación: <span className="font-medium">{inviteLink}</span></p>
           {connectionMessage ? <p className="text-xs text-amber-600">{connectionMessage}</p> : null}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-2 text-base font-semibold text-primary">Modo de partida</h2>
+        <div className="space-y-2 text-sm text-gray-700">
+          <p>Modo actual: <span className="font-medium">{state.room.selected_mode === 'party' ? 'Fiesta' : state.room.selected_mode === 'soft' ? 'Suave' : 'Sin definir'}</span></p>
+          {isHost ? (
+            <form action={modeAction} className="flex gap-2">
+              <input type="hidden" name="roomId" value={state.room.id} />
+              <input type="hidden" name="participantId" value={currentParticipantId ?? ''} />
+              <button className="rounded border px-3 py-1 text-sm" type="submit" name="selectedMode" value="soft" disabled={modePending || state.room.status !== 'lobby'}>Suave</button>
+              <button className="rounded border px-3 py-1 text-sm" type="submit" name="selectedMode" value="party" disabled={modePending || state.room.status !== 'lobby'}>Fiesta</button>
+            </form>
+          ) : (
+            <p className="text-xs text-gray-500">Solo el host puede editar el modo.</p>
+          )}
+          {modeState.error ? <p className="text-xs text-rose-600">{modeState.error}</p> : null}
         </div>
       </Card>
 
@@ -104,6 +125,15 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           ))}
         </ul>
       </Card>
+
+      {isHost ? (
+        <Card>
+          <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled={!startStatus.canStart}>
+            Iniciar partida
+          </button>
+          {!startStatus.canStart ? <p className="mt-2 text-xs text-gray-600">{startStatus.reason}</p> : null}
+        </Card>
+      ) : null}
     </>
   );
 }
