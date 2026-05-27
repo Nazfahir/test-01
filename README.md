@@ -74,3 +74,21 @@ Debe responder `status: "ok"` y flags `supabase.configured/hasUrl/hasAnonKey` en
 3. Copiar `service_role key` en `.env.local` como variable privada server-only.
 
 > Esta base solo prepara wiring técnico. No implementa lógica de auth, salas, juego, vínculo ni moneda todavía.
+
+## Migraciones de base de datos (Supabase)
+
+Con Supabase CLI instalado y el proyecto linkeado:
+
+```bash
+supabase db reset
+```
+
+Aplica todas las migraciones locales (incluyendo schema MVP inicial y seed técnico de prompts).
+
+Para crear nuevas migraciones:
+
+```bash
+supabase migration new <nombre_migracion>
+```
+
+Para revertir en local, la vía recomendada en este MVP es reconstruir la DB local con `supabase db reset` (drop + recreate + reapply migrations).
