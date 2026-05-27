@@ -28,6 +28,25 @@ async function getCurrentUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+async function getActorParticipantId(roomId: string): Promise<string | null> {
+  const supabase = getSupabaseServiceRoleClient();
+  const userId = await getCurrentUserId();
+  const guestSessionId = userId ? null : await getGuestSessionIdFromCookie();
+
+  if (!userId && !guestSessionId) return null;
+
+  let query = supabase
+    .from('room_participants')
+    .select('id')
+    .eq('room_id', roomId)
+    .is('left_at', null)
+    .limit(1);
+
+  query = userId ? query.eq('user_id', userId) : query.eq('guest_session_id', guestSessionId ?? '');
+  const { data } = await query.maybeSingle();
+  return data?.id ?? null;
+}
+
 async function upsertGuest(displayName: string): Promise<string> {
   const supabase = getSupabaseServiceRoleClient();
   const existingSessionId = await getGuestSessionIdFromCookie();
@@ -188,10 +207,9 @@ function mapStartMatchError(code: StartMatchErrorCode): string {
 export async function updateSelectedModeAction(_: UpdateModeActionState, formData: FormData): Promise<UpdateModeActionState> {
   try {
     const roomId = String(formData.get('roomId') ?? '');
-    const participantId = String(formData.get('participantId') ?? '');
     const selectedMode = String(formData.get('selectedMode') ?? '');
 
-    if (!roomId || !participantId || !selectedMode) return { error: 'No pudimos actualizar el modo. Falta información de la sala.' };
+    if (!roomId || !selectedMode) return { error: 'No pudimos actualizar el modo. Falta información de la sala.' };
     if (!canSelectMode({ roomStatus: 'lobby', isHost: true, selectedMode })) {
       return { error: 'Modo inválido. Elige Suave o Fiesta.' };
     }
@@ -206,7 +224,10 @@ export async function updateSelectedModeAction(_: UpdateModeActionState, formDat
 
     if (!room) return { error: 'No encontramos la sala para actualizar el modo.' };
 
-    const isHost = room.host_participant_id === participantId;
+    const actorParticipantId = await getActorParticipantId(roomId);
+    if (!actorParticipantId) return { error: 'ROOM_NOT_ACCESSIBLE' };
+
+    const isHost = room.host_participant_id === actorParticipantId;
     if (!canSelectMode({ roomStatus: room.status as RoomStatus, isHost, selectedMode })) {
       return { error: isHost ? 'La sala ya cambió de estado. Vuelve al lobby para continuar.' : 'Solo el host puede cambiar el modo.' };
     }
@@ -215,7 +236,7 @@ export async function updateSelectedModeAction(_: UpdateModeActionState, formDat
       .from('rooms')
       .update({ selected_mode: selectedMode })
       .eq('id', roomId)
-      .eq('host_participant_id', participantId)
+      .eq('host_participant_id', actorParticipantId)
       .eq('status', 'lobby');
 
     if (error) return { error: 'No pudimos guardar el modo. Intenta nuevamente.' };
@@ -230,10 +251,11 @@ export async function startMatchAction(_: StartMatchActionState, formData: FormD
   try {
     const roomId = String(formData.get('roomId') ?? '');
     const roomCode = String(formData.get('roomCode') ?? '').toUpperCase();
-    const actorParticipantId = String(formData.get('participantId') ?? '');
-    if ((!roomId && !roomCode) || !actorParticipantId) return { error: 'No pudimos iniciar la partida. Falta información de sala o host.' };
+    if (!roomId && !roomCode) return { error: 'No pudimos iniciar la partida. Falta información de sala o host.' };
 
     const supabase = getSupabaseServiceRoleClient();
+    const actorParticipantId = roomId ? await getActorParticipantId(roomId) : null;
+    if (!actorParticipantId) return { error: 'ROOM_NOT_ACCESSIBLE' };
 
     const result = await startMatch(
       {
