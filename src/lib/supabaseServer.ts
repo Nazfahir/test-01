@@ -1,24 +1,34 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { getRequiredEnv } from '@/lib/env';
+import { getPublicEnv, getServiceRoleKey } from '@/lib/env';
 
 type CookieToSet = { name: string; value: string; options?: Record<string, unknown> };
 
-export async function createSupabaseServerClient() {
+export async function getSupabaseServerClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
+  const { supabaseUrl, supabaseAnonKey } = getPublicEnv();
 
-  return createServerClient(
-    getRequiredEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    getRequiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: CookieToSet[]) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        },
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet: CookieToSet[]) {
+        cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
       },
     },
-  );
+  });
+}
+
+export function getSupabaseServiceRoleClient(): SupabaseClient {
+  const { supabaseUrl } = getPublicEnv();
+  const serviceRoleKey = getServiceRoleKey();
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 }
