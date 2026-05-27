@@ -1,9 +1,10 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
-import { updateSelectedModeAction } from '@/features/rooms/actions';
+import { startMatchAction, updateSelectedModeAction } from '@/features/rooms/actions';
 import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
 
 type Props = {
@@ -16,8 +17,14 @@ type Props = {
 
 export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initialParticipants, currentParticipantId }: Props) {
   const [state, setState] = useState<LobbyState>({ room: initialRoom, participants: normalizeParticipants(initialParticipants) });
+  const router = useRouter();
   const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
   const [modeState, modeAction, modePending] = useActionState(updateSelectedModeAction, {});
+  const [startState, startAction, startPending] = useActionState(startMatchAction, {});
+
+  useEffect(() => {
+    if (startState.redirectTo) router.push(startState.redirectTo);
+  }, [router, startState.redirectTo]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -128,9 +135,15 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
 
       {isHost ? (
         <Card>
-          <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled={!startStatus.canStart}>
-            Iniciar partida
-          </button>
+          <form action={startAction}>
+            <input type="hidden" name="roomId" value={state.room.id} />
+            <input type="hidden" name="roomCode" value={roomCode} />
+            <input type="hidden" name="participantId" value={currentParticipantId ?? ''} />
+            <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={!startStatus.canStart || startPending}>
+              {startPending ? 'Iniciando…' : 'Iniciar partida'}
+            </button>
+          </form>
+          {startState.error ? <p className="mt-2 text-xs text-rose-600">{startState.error}</p> : null}
           {!startStatus.canStart ? <p className="mt-2 text-xs text-gray-600">{startStatus.reason}</p> : null}
         </Card>
       ) : null}
