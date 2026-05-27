@@ -6,6 +6,7 @@ import { ensureGuestSessionCookie, getGuestSessionIdFromCookie } from '@/feature
 import { generateRoomCode } from '@/features/rooms/room-code';
 import { canSelectMode, validateJoinRoom, type JoinRoomValidationError, type RoomStatus } from '@/features/rooms/rules';
 import { startMatch, type RoundGameType, type StartMatchErrorCode } from '@/features/rooms/start-match';
+import { transitionRound, type RoundFlowErrorCode } from '@/features/rooms/round-flow';
 
 type RoomsActionState = { error?: string };
 
@@ -186,6 +187,7 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
 
 type UpdateModeActionState = { ok?: true; error?: string };
 type StartMatchActionState = { ok?: true; redirectTo?: string; error?: string };
+type RoundControlActionState = { ok?: true; error?: string };
 
 function mapStartMatchError(code: StartMatchErrorCode): string {
   switch (code) {
@@ -201,6 +203,17 @@ function mapStartMatchError(code: StartMatchErrorCode): string {
       return 'Nos faltan preguntas para una de las rondas de este modo. Prueba nuevamente en un momento.';
     case 'MATCH_ALREADY_STARTED':
       return 'Esta partida ya fue iniciada desde otro dispositivo.';
+  }
+}
+
+function mapRoundFlowError(code: RoundFlowErrorCode): string {
+  switch (code) {
+    case 'NOT_HOST': return 'Solo el host puede controlar la ronda.';
+    case 'ROOM_NOT_IN_GAME': return 'La sala no está en partida activa.';
+    case 'MATCH_NOT_ACTIVE': return 'La partida ya cambió de estado.';
+    case 'ROUND_NOT_CURRENT': return 'Esa ronda ya no es la actual. Sin drama: actualiza y seguimos.';
+    case 'INVALID_ROUND_STATE': return 'Ese botón no aplica en este momento de la ronda.';
+    case 'ROUND_NOT_FOUND': return 'No encontramos esa ronda en curso.';
   }
 }
 
@@ -336,4 +349,81 @@ export async function startMatchAction(_: StartMatchActionState, formData: FormD
   } catch {
     return { error: 'No pudimos iniciar la partida por ahora. Reintenta en unos segundos.' };
   }
+}
+
+async function controlRoundAction(
+  _: RoundControlActionState,
+  formData: FormData,
+  action: 'lock' | 'reveal' | 'advance',
+): Promise<RoundControlActionState> {
+  const roomId = String(formData.get('roomId') ?? '');
+  const matchId = String(formData.get('matchId') ?? '');
+  const roundId = String(formData.get('roundId') ?? '');
+  if (!roomId || !matchId || !roundId) return { error: 'Falta contexto de partida para controlar la ronda.' };
+  const actorParticipantId = await getActorParticipantId(roomId);
+  if (!actorParticipantId) return { error: 'No pudimos validar tu participación en la sala.' };
+  const supabase = getSupabaseServiceRoleClient();
+
+  const result = await transitionRound(
+    {
+      async getContext({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId }) {
+        const [roomRes, matchRes, roundRes] = await Promise.all([
+          supabase.from('rooms').select('status,host_participant_id').eq('id', aRoomId).maybeSingle(),
+          supabase.from('matches').select('id,status,current_round_id').eq('id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+          supabase.from('rounds').select('id,match_id,status,round_order').eq('id', aRoundId).eq('match_id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+        ]);
+        return { room: roomRes.data as never, match: matchRes.data as never, round: roundRes.data as never };
+      },
+      async lockRoundWithSkips({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, now }) {
+        const { data: participants } = await supabase.from('room_participants').select('id').eq('room_id', aRoomId).is('left_at', null);
+        const { data: existing } = await supabase.from('round_submissions').select('participant_id').eq('round_id', aRoundId);
+        const existingIds = new Set((existing ?? []).map((row) => row.participant_id));
+        const missing = (participants ?? []).filter((p) => !existingIds.has(p.id)).map((p) => ({
+          round_id: aRoundId, match_id: aMatchId, room_id: aRoomId, participant_id: p.id, submission_type: 'skip', status: 'skipped', submitted_at: now,
+        }));
+        if (missing.length > 0) {
+          await supabase.from('round_submissions').upsert(missing, { onConflict: 'round_id,participant_id', ignoreDuplicates: true });
+        }
+        const { data: updated } = await supabase
+          .from('rounds')
+          .update({ status: 'locked', locked_at: now })
+          .eq('id', aRoundId)
+          .eq('status', 'question')
+          .select('id')
+          .maybeSingle();
+        return Boolean(updated);
+      },
+      async updateRoundState({ roundId: aRoundId, expectedStatus, nextStatus, now }) {
+        const patch = nextStatus === 'reveal' ? { status: nextStatus, reveal_at: now } : { status: nextStatus };
+        const { data } = await supabase.from('rounds').update(patch).eq('id', aRoundId).eq('status', expectedStatus).select('id').maybeSingle();
+        return Boolean(data);
+      },
+      async completeRoundAndAdvance({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, roundOrder, now }) {
+        const { data: finishedRound } = await supabase.from('rounds').update({ status: 'finished', finished_at: now }).eq('id', aRoundId).eq('status', 'reveal').select('id').maybeSingle();
+        if (!finishedRound) return null;
+        if (roundOrder >= 3) {
+          await supabase.from('matches').update({ status: 'finished', finished_at: now, current_round_id: null }).eq('id', aMatchId);
+          await supabase.from('rooms').update({ status: 'results', finished_at: now }).eq('id', aRoomId);
+          return { nextRoundId: null, matchFinished: true };
+        }
+        const { data: nextRound } = await supabase.from('rounds').update({ status: 'question', started_at: now }).eq('match_id', aMatchId).eq('round_order', roundOrder + 1).eq('status', 'waiting').select('id').maybeSingle();
+        if (!nextRound) return null;
+        await supabase.from('matches').update({ current_round_id: nextRound.id, status: 'in_progress' }).eq('id', aMatchId);
+        return { nextRoundId: nextRound.id, matchFinished: false };
+      },
+    },
+    { roomId, matchId, roundId, actorParticipantId, action },
+  );
+  if (!result.ok) return { error: mapRoundFlowError(result.code) };
+  return { ok: true };
+}
+
+export async function lockRoundAction(state: RoundControlActionState, formData: FormData): Promise<RoundControlActionState> {
+  return controlRoundAction(state, formData, 'lock');
+}
+export async function revealRoundAction(state: RoundControlActionState, formData: FormData): Promise<RoundControlActionState> {
+  return controlRoundAction(state, formData, 'reveal');
+}
+export async function advanceRoundAction(state: RoundControlActionState, formData: FormData): Promise<RoundControlActionState> {
+  return controlRoundAction(state, formData, 'advance');
 }
