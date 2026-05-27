@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import { getSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 import { Card } from '@/components/ui/Card';
+import { getSupabaseServiceRoleClient, getSupabaseServerClient } from '@/lib/supabaseServer';
+import { getGuestSessionIdFromCookie } from '@/features/guests/session';
+import { LobbyRealtimeClient } from '@/features/rooms/lobby-realtime-client';
 
 export default async function LobbyPage({ params }: { params: Promise<{ roomCode: string }> }) {
   const { roomCode } = await params;
@@ -8,34 +10,43 @@ export default async function LobbyPage({ params }: { params: Promise<{ roomCode
   const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/rooms/${normalizedRoomCode}`;
 
   const supabase = getSupabaseServiceRoleClient();
+  const serverClient = await getSupabaseServerClient();
+  const [{ data: authUser }, guestSessionId] = await Promise.all([serverClient.auth.getUser(), getGuestSessionIdFromCookie()]);
+
   const { data: room } = await supabase
     .from('rooms')
-    .select('id, room_code')
+    .select('id, room_code, status, selected_mode, host_participant_id, min_players, max_players')
     .eq('room_code', normalizedRoomCode)
     .maybeSingle();
 
-  const { count: participants } = await supabase
+  if (!room) {
+    return <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">Sala no encontrada.</main>;
+  }
+
+  const { data: participants } = await supabase
     .from('room_participants')
-    .select('id', { count: 'exact', head: true })
-    .eq('room_id', room?.id ?? '')
-    .is('left_at', null);
+    .select('id, display_name, is_host, joined_at, left_at, connection_status, last_seen_at, updated_at, user_id, guest_session_id')
+    .eq('room_id', room.id);
+
+  const currentParticipant = participants?.find((p) =>
+    authUser.user?.id ? p.user_id === authUser.user.id : guestSessionId ? p.guest_session_id === guestSessionId : false,
+  );
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold text-primary">Lobby de sala</h1>
       <p className="text-sm text-gray-600">Todo listo. Comparte y esperen al resto del grupo 🚀</p>
 
+      <LobbyRealtimeClient
+        roomCode={normalizedRoomCode}
+        inviteLink={inviteLink}
+        initialRoom={room}
+        initialParticipants={(participants ?? []).map(({ user_id: _user, guest_session_id: _guest, ...rest }) => rest)}
+        currentParticipantId={currentParticipant?.id ?? null}
+      />
+
       <Card>
-        <div className="space-y-2 text-sm text-gray-700">
-          <p>
-            Código: <strong>{normalizedRoomCode}</strong>
-          </p>
-          <p>Participantes conectados: {participants ?? 0}</p>
-          <p className="break-all">
-            Link de invitación: <span className="font-medium">{inviteLink}</span>
-          </p>
-          <p className="text-xs text-gray-500">QR: placeholder técnico (pendiente render visual).</p>
-        </div>
+        <p className="text-xs text-gray-500">QR: placeholder técnico (pendiente render visual).</p>
       </Card>
 
       <Link className="text-sm font-medium text-primary underline" href="/rooms/join">
