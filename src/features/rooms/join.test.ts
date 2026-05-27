@@ -1,35 +1,80 @@
 import { describe, expect, it } from 'vitest';
-import { validateGuestJoin } from '@/features/rooms/join';
+import { validateJoinRoom } from '@/features/rooms/rules';
 
-describe('validateGuestJoin', () => {
+describe('validateJoinRoom', () => {
   it('returns room_not_found when room does not exist', () => {
     expect(
-      validateGuestJoin({ roomExists: false, roomState: 'lobby', participantCount: 0 }),
+      validateJoinRoom({
+        roomExists: false,
+        roomStatus: 'lobby',
+        isExpired: false,
+        activeParticipantCount: 0,
+        maxParticipants: 8,
+        hasActiveParticipant: false,
+      }),
     ).toBe('room_not_found');
   });
 
-  it('blocks in_game rooms', () => {
-    expect(validateGuestJoin({ roomExists: true, roomState: 'in_game', participantCount: 1 })).toBe(
-      'room_in_game',
-    );
+  it('blocks non-lobby states', () => {
+    expect(
+      validateJoinRoom({
+        roomExists: true,
+        roomStatus: 'in_game',
+        isExpired: false,
+        activeParticipantCount: 1,
+        maxParticipants: 8,
+        hasActiveParticipant: false,
+      }),
+    ).toBe('room_invalid_state');
   });
 
   it('blocks closed or expired rooms', () => {
-    expect(validateGuestJoin({ roomExists: true, roomState: 'closed', participantCount: 1 })).toBe(
-      'room_closed_or_expired',
-    );
-    expect(validateGuestJoin({ roomExists: true, roomState: 'expired', participantCount: 1 })).toBe(
-      'room_closed_or_expired',
-    );
+    expect(
+      validateJoinRoom({
+        roomExists: true,
+        roomStatus: 'closed',
+        isExpired: false,
+        activeParticipantCount: 1,
+        maxParticipants: 8,
+        hasActiveParticipant: false,
+      }),
+    ).toBe('room_invalid_state');
+
+    expect(
+      validateJoinRoom({
+        roomExists: true,
+        roomStatus: 'lobby',
+        isExpired: true,
+        activeParticipantCount: 1,
+        maxParticipants: 8,
+        hasActiveParticipant: false,
+      }),
+    ).toBe('room_closed_or_expired');
   });
 
-  it('blocks full rooms', () => {
-    expect(validateGuestJoin({ roomExists: true, roomState: 'lobby', participantCount: 8 })).toBe(
-      'room_full',
-    );
+  it('blocks full rooms for new participants', () => {
+    expect(
+      validateJoinRoom({
+        roomExists: true,
+        roomStatus: 'lobby',
+        isExpired: false,
+        activeParticipantCount: 8,
+        maxParticipants: 8,
+        hasActiveParticipant: false,
+      }),
+    ).toBe('room_full');
   });
 
-  it('allows valid lobby rooms', () => {
-    expect(validateGuestJoin({ roomExists: true, roomState: 'lobby', participantCount: 3 })).toBeNull();
+  it('allows reusing existing active participant even when room is full', () => {
+    expect(
+      validateJoinRoom({
+        roomExists: true,
+        roomStatus: 'lobby',
+        isExpired: false,
+        activeParticipantCount: 8,
+        maxParticipants: 8,
+        hasActiveParticipant: true,
+      }),
+    ).toBeNull();
   });
 });
