@@ -5,6 +5,7 @@ import { getSupabaseServerClient, getSupabaseServiceRoleClient } from '@/lib/sup
 import { ensureGuestSessionCookie, getGuestSessionIdFromCookie } from '@/features/guests/session';
 import { generateRoomCode } from '@/features/rooms/room-code';
 import { canSelectMode, validateJoinRoom, type JoinRoomValidationError, type RoomStatus } from '@/features/rooms/rules';
+import { startMatch, type RoundGameType, type StartMatchErrorCode } from '@/features/rooms/start-match';
 
 type RoomsActionState = { error?: string };
 
@@ -165,6 +166,24 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
 
 
 type UpdateModeActionState = { ok?: true; error?: string };
+type StartMatchActionState = { ok?: true; redirectTo?: string; error?: string };
+
+function mapStartMatchError(code: StartMatchErrorCode): string {
+  switch (code) {
+    case 'NOT_HOST':
+      return 'Solo el host puede iniciar la partida.';
+    case 'ROOM_NOT_IN_LOBBY':
+      return 'La sala ya no está en lobby. Actualiza para ver el estado actual.';
+    case 'INVALID_PLAYER_COUNT':
+      return 'Necesitan entre 3 y 8 participantes activos para iniciar.';
+    case 'MODE_NOT_SELECTED':
+      return 'Antes de iniciar, elige modo Suave o Fiesta.';
+    case 'PROMPTS_UNAVAILABLE':
+      return 'Nos faltan preguntas para una de las rondas de este modo. Prueba nuevamente en un momento.';
+    case 'MATCH_ALREADY_STARTED':
+      return 'Esta partida ya fue iniciada desde otro dispositivo.';
+  }
+}
 
 export async function updateSelectedModeAction(_: UpdateModeActionState, formData: FormData): Promise<UpdateModeActionState> {
   try {
@@ -204,5 +223,95 @@ export async function updateSelectedModeAction(_: UpdateModeActionState, formDat
     return { ok: true };
   } catch {
     return { error: 'Tuvimos un problema al actualizar el modo. Reintenta en unos segundos.' };
+  }
+}
+
+export async function startMatchAction(_: StartMatchActionState, formData: FormData): Promise<StartMatchActionState> {
+  try {
+    const roomId = String(formData.get('roomId') ?? '');
+    const roomCode = String(formData.get('roomCode') ?? '').toUpperCase();
+    const actorParticipantId = String(formData.get('participantId') ?? '');
+    if ((!roomId && !roomCode) || !actorParticipantId) return { error: 'No pudimos iniciar la partida. Falta información de sala o host.' };
+
+    const supabase = getSupabaseServiceRoleClient();
+
+    const result = await startMatch(
+      {
+        async findRoom({ roomId: searchRoomId, roomCode: searchRoomCode }) {
+          let query = supabase.from('rooms').select('id, room_code, status, selected_mode, min_players, max_players, host_participant_id');
+          query = searchRoomId ? query.eq('id', searchRoomId) : query.eq('room_code', searchRoomCode ?? '');
+          const { data } = await query.maybeSingle();
+          return data as never;
+        },
+        async countActiveParticipants(searchRoomId) {
+          const { count } = await supabase.from('room_participants').select('id', { count: 'exact', head: true }).eq('room_id', searchRoomId).is('left_at', null);
+          return count ?? 0;
+        },
+        async findActiveMatch(searchRoomId) {
+          const { data: match } = await supabase
+            .from('matches')
+            .select('id,status,current_round_id')
+            .eq('room_id', searchRoomId)
+            .in('status', ['created', 'in_progress'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!match) return null;
+          return { id: match.id, currentRoundId: match.current_round_id };
+        },
+        async takePrompts(mode, gameTypes) {
+          const { data } = await supabase.from('prompts').select('id,game_type').eq('mode', mode).eq('active', true).in('game_type', gameTypes).limit(40);
+          const seen = new Set<string>();
+          const picked: { id: string; game_type: RoundGameType }[] = [];
+          for (const gameType of gameTypes) {
+            const found = (data ?? []).find((prompt) => prompt.game_type === gameType && !seen.has(prompt.id));
+            if (found) {
+              seen.add(found.id);
+              picked.push(found as { id: string; game_type: RoundGameType });
+            }
+          }
+          return picked;
+        },
+        async createMatchWithRounds({ room, actorParticipantId: actorId, promptsByType }) {
+          const now = new Date().toISOString();
+
+          const { data: lockedRoom } = await supabase
+            .from('rooms')
+            .update({ status: 'in_game', started_at: now })
+            .eq('id', room.id)
+            .eq('status', 'lobby')
+            .select('id')
+            .maybeSingle();
+          if (!lockedRoom) throw new Error('room_already_started');
+
+          const { data: match, error: matchError } = await supabase
+            .from('matches')
+            .insert({ room_id: room.id, status: 'created', selected_mode: room.selected_mode, created_by_participant_id: actorId, started_at: now })
+            .select('id, room_id, status')
+            .single();
+          if (matchError || !match) throw new Error('match_insert_error');
+
+          const roundRows = [
+            { match_id: match.id, room_id: room.id, round_order: 1, game_type: 'would_you_rather', prompt_id: promptsByType.would_you_rather, status: 'question', started_at: now },
+            { match_id: match.id, room_id: room.id, round_order: 2, game_type: 'most_likely_to', prompt_id: promptsByType.most_likely_to, status: 'waiting' },
+            { match_id: match.id, room_id: room.id, round_order: 3, game_type: 'dont_repeat', prompt_id: promptsByType.dont_repeat, status: 'waiting' },
+          ] as const;
+
+          const { data: rounds, error: roundsError } = await supabase.from('rounds').insert(roundRows).select('id,round_order,game_type,status').order('round_order', { ascending: true });
+          if (roundsError || !rounds || rounds.length !== 3) throw new Error('rounds_insert_error');
+
+          const currentRoundId = rounds[0].id;
+          await supabase.from('matches').update({ status: 'in_progress', current_round_id: currentRoundId, started_at: now }).eq('id', match.id);
+
+          return { match, rounds: rounds as never, currentRoundId };
+        },
+      },
+      { roomId: roomId || undefined, roomCode: roomCode || undefined, actorParticipantId },
+    );
+
+    if (!result.ok) return { error: mapStartMatchError(result.code) };
+    return { ok: true, redirectTo: `/rooms/${result.roomCode}/play` };
+  } catch {
+    return { error: 'No pudimos iniciar la partida por ahora. Reintenta en unos segundos.' };
   }
 }
