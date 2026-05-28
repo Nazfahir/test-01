@@ -7,6 +7,7 @@ import { generateRoomCode } from '@/features/rooms/room-code';
 import { canSelectMode, validateJoinRoom, type JoinRoomValidationError, type RoomStatus } from '@/features/rooms/rules';
 import { startMatch, type RoundGameType, type StartMatchErrorCode } from '@/features/rooms/start-match';
 import { transitionRound, type RoundFlowErrorCode } from '@/features/rooms/round-flow';
+import { submitWouldYouRatherChoice, type SubmitWyrErrorCode } from '@/features/rooms/submit-wyr';
 
 type RoomsActionState = { error?: string };
 
@@ -203,6 +204,20 @@ function mapStartMatchError(code: StartMatchErrorCode): string {
       return 'Nos faltan preguntas para una de las rondas de este modo. Prueba nuevamente en un momento.';
     case 'MATCH_ALREADY_STARTED':
       return 'Esta partida ya fue iniciada desde otro dispositivo.';
+  }
+}
+
+
+
+function mapSubmitWyrError(code: SubmitWyrErrorCode): string {
+  switch (code) {
+    case 'PARTICIPANT_NOT_IN_ROOM': return 'No pudimos validar tu participación activa en esta sala.';
+    case 'ROUND_NOT_FOUND': return 'No encontramos la ronda actual para registrar tu respuesta.';
+    case 'ROUND_NOT_CURRENT': return 'Esa ronda ya cambió. Actualiza la pantalla y seguimos.';
+    case 'ROUND_NOT_WYR': return 'Esta ronda no corresponde a ¿Qué prefieres?.';
+    case 'ROUND_NOT_ACCEPTING_SUBMISSIONS': return 'Esta ronda ya no acepta respuestas.';
+    case 'PROMPT_OPTIONS_CORRUPTED': return 'La pregunta tiene opciones incompletas. El host puede avanzar y probar otra ronda.';
+    case 'INVALID_CHOICE': return 'Esa opción no es válida para esta pregunta.';
   }
 }
 
@@ -426,4 +441,62 @@ export async function revealRoundAction(state: RoundControlActionState, formData
 }
 export async function advanceRoundAction(state: RoundControlActionState, formData: FormData): Promise<RoundControlActionState> {
   return controlRoundAction(state, formData, 'advance');
+}
+
+
+type SubmitChoiceActionState = { ok?: true; alreadySubmitted?: boolean; error?: string };
+
+export async function submitWouldYouRatherChoiceAction(_: SubmitChoiceActionState, formData: FormData): Promise<SubmitChoiceActionState> {
+  const roomId = String(formData.get('roomId') ?? '');
+  const matchId = String(formData.get('matchId') ?? '');
+  const roundId = String(formData.get('roundId') ?? '');
+  const choiceKey = String(formData.get('choiceKey') ?? '').trim();
+  if (!roomId || !matchId || !roundId || !choiceKey) return { error: 'Falta información para enviar tu elección.' };
+
+  const actorParticipantId = await getActorParticipantId(roomId);
+  if (!actorParticipantId) return { error: 'No pudimos validar tu participación en la sala.' };
+
+  const supabase = getSupabaseServiceRoleClient();
+  const result = await submitWouldYouRatherChoice(
+    {
+      async getContext({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, actorParticipantId: aActorParticipantId }) {
+        const [participantRes, matchRes, roundRes] = await Promise.all([
+          supabase.from('room_participants').select('id').eq('id', aActorParticipantId).eq('room_id', aRoomId).is('left_at', null).maybeSingle(),
+          supabase.from('matches').select('id,current_round_id').eq('id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+          supabase.from('rounds').select('id,status,game_type,prompt_id').eq('id', aRoundId).eq('match_id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+        ]);
+
+        const promptId = roundRes.data?.prompt_id;
+        const promptRes = promptId ? await supabase.from('prompts').select('options').eq('id', promptId).maybeSingle() : { data: null };
+
+        return {
+          participantExists: Boolean(participantRes.data),
+          match: matchRes.data as never,
+          round: roundRes.data as never,
+          prompt: promptRes.data as never,
+        };
+      },
+      async insertSubmission({ roundId: aRoundId, matchId: aMatchId, roomId: aRoomId, participantId, choiceKey: aChoiceKey, now }) {
+        const { data } = await supabase
+          .from('round_submissions')
+          .upsert({
+            round_id: aRoundId,
+            match_id: aMatchId,
+            room_id: aRoomId,
+            participant_id: participantId,
+            submission_type: 'choice',
+            status: 'submitted',
+            choice_key: aChoiceKey,
+            submitted_at: now,
+          }, { onConflict: 'round_id,participant_id', ignoreDuplicates: true })
+          .select('id')
+          .maybeSingle();
+        return { inserted: Boolean(data) };
+      },
+    },
+    { roomId, matchId, roundId, actorParticipantId, choiceKey },
+  );
+
+  if (!result.ok) return { error: mapSubmitWyrError(result.code) };
+  return { ok: true, alreadySubmitted: result.alreadySubmitted };
 }

@@ -16,13 +16,20 @@ export default async function PlayPage({ params }: { params: Promise<{ roomCode:
   const { data: match } = await supabase.from('matches').select('id,current_round_id,status').eq('room_id', room.id).in('status', ['created', 'in_progress']).order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (!match?.current_round_id) return <Card><p>No hay ronda activa en este momento.</p></Card>;
 
-  const { data: round } = await supabase.from('rounds').select('id,status,round_order').eq('id', match.current_round_id).maybeSingle();
+  const { data: round } = await supabase.from('rounds').select('id,status,round_order,game_type,prompt_id').eq('id', match.current_round_id).maybeSingle();
   const { data: participants } = await supabase.from('room_participants').select('id,display_name').eq('room_id', room.id).is('left_at', null);
   const guestSessionId = userData.user ? null : await getGuestSessionIdFromCookie();
   let actorQuery = supabase.from('room_participants').select('id').eq('room_id', room.id).is('left_at', null).limit(1);
   actorQuery = userData.user ? actorQuery.eq('user_id', userData.user.id) : actorQuery.eq('guest_session_id', guestSessionId ?? '');
   const { data: actor } = await actorQuery.maybeSingle();
   const isHost = actor?.id === room.host_participant_id;
+
+  const { data: prompt } = round?.prompt_id ? await supabase.from('prompts').select('content,options').eq('id', round.prompt_id).maybeSingle() : { data: null };
+  const { data: existingSubmission } = actor && round
+    ? await supabase.from('round_submissions').select('id').eq('round_id', round.id).eq('participant_id', actor.id).maybeSingle()
+    : { data: null };
+
+  const options = Array.isArray(prompt?.options) ? prompt.options.filter((item): item is string => typeof item === 'string') : [];
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
@@ -31,7 +38,7 @@ export default async function PlayPage({ params }: { params: Promise<{ roomCode:
         <p className="text-sm text-slate-600">Estado: {round?.status ?? 'desconocido'}.</p>
         <p className="text-sm text-slate-600">Participantes activos: {participants?.length ?? 0}.</p>
       </Card>
-      {round ? <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} isHost={isHost} /> : null}
+      {round ? <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} gameType={round.game_type} question={prompt?.content ?? 'Pregunta no disponible.'} options={options} isHost={isHost} hasSubmitted={Boolean(existingSubmission)} /> : null}
     </main>
   );
 }
