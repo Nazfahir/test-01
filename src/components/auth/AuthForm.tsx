@@ -14,16 +14,17 @@ type Props = {
   mode: 'login' | 'register';
   action: (state: AuthFormState, formData: FormData) => Promise<AuthFormState>;
   initialState: AuthFormState;
+  successRedirectTo?: string;
 };
 
-export function AuthForm({ title, submitLabel, mode, action, initialState }: Props) {
+export function AuthForm({ title, submitLabel, mode, action, initialState, successRedirectTo }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const router = useRouter();
 
   useEffect(() => {
     if (state.status === 'success' && mode === 'login') router.push('/profile');
-    if (state.status === 'success' && mode === 'register') router.push('/auth/login');
-  }, [mode, router, state.status]);
+    if (state.status === 'success' && mode === 'register') router.push(successRedirectTo ?? '/auth/login');
+  }, [mode, router, state.status, successRedirectTo]);
 
   return (
     <Card>

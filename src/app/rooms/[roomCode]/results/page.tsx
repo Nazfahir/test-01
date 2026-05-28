@@ -103,7 +103,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ roomCo
           <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-100/10 p-3 text-sm text-amber-100">
             <p className="font-medium">Guarda tus monedas y progreso</p>
             <p className="mt-1">Puedes crear cuenta local para intentar asociar esta recompensa. Si algo falla, te avisaremos con claridad en el flujo de registro.</p>
-            <Link href="/auth/register" className="mt-2 inline-block underline">Crear cuenta local</Link>
+            <Link href={`/auth/register?next=${encodeURIComponent(`/rooms/${room.room_code}/results`)}`} className="mt-2 inline-block underline">Crear cuenta local</Link>
           </div>
         ) : null}
       </section>
