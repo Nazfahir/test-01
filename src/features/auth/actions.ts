@@ -3,16 +3,10 @@
 import { redirect } from 'next/navigation';
 import { getSupabaseServerClient, getSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 import { validateLoginInput, validateRegisterInput } from '@/features/auth/validation';
+import type { AuthFormState } from '@/features/auth/state';
 import { getGuestSessionIdFromCookie } from '@/features/guests/session';
 import { convertGuestProgress } from '@/features/guests/convert-progress';
 import { getErrorUX } from '@/features/errors/catalog';
-
-export type AuthFormState = {
-  status: 'idle' | 'success' | 'error';
-  message?: string;
-};
-
-export const initialAuthState: AuthFormState = { status: 'idle' };
 
 export async function registerAction(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const email = String(formData.get('email') ?? '').trim();

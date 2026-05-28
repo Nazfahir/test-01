@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import type { AuthFormState } from '@/features/auth/actions';
+import type { AuthFormState } from '@/features/auth/state';
 import { uxCopy } from '@/copy/ux';
 
 type Props = {

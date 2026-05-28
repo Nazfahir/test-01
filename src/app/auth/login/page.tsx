@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AuthForm } from '@/components/auth/AuthForm';
-import { initialAuthState, loginAction } from '@/features/auth/actions';
+import { loginAction } from '@/features/auth/actions';
+import { initialAuthState } from '@/features/auth/state';
 import { getSupabaseServerClient } from '@/lib/supabaseServer';
 import { uxCopy } from '@/copy/ux';
 

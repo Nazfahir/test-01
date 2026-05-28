@@ -40,6 +40,7 @@ cp .env.example .env.local
 
 - `NEXT_PUBLIC_SUPABASE_URL`: URL del proyecto Supabase.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key para operaciones permitidas por RLS.
+- `NEXT_PUBLIC_APP_URL`: URL pública de la app para links de invitación (ej. `https://tu-app.vercel.app`).
 
 ### Variables privadas (solo servidor)
 
@@ -72,6 +73,7 @@ Debe responder `status: "ok"` y flags `supabase.configured/hasUrl/hasAnonKey` en
 1. Crear proyecto en Supabase.
 2. Copiar `Project URL` y `anon key` en `.env.local`.
 3. Copiar `service_role key` en `.env.local` como variable privada server-only.
+4. Configurar `NEXT_PUBLIC_APP_URL` con la URL final de Vercel para que los links de invitación no apunten a localhost.
 
 > Esta base solo prepara wiring técnico. No implementa lógica de auth, salas, juego, vínculo ni moneda todavía.
 
