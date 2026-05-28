@@ -8,6 +8,7 @@ import { canSelectMode, validateJoinRoom, type JoinRoomValidationError, type Roo
 import { startMatch, type RoundGameType, type StartMatchErrorCode } from '@/features/rooms/start-match';
 import { transitionRound, type RoundFlowErrorCode } from '@/features/rooms/round-flow';
 import { submitWouldYouRatherChoice, type SubmitWyrErrorCode } from '@/features/rooms/submit-wyr';
+import { submitMostLikelyVote, type SubmitMostLikelyErrorCode } from '@/features/rooms/submit-most-likely';
 
 type RoomsActionState = { error?: string };
 
@@ -218,6 +219,17 @@ function mapSubmitWyrError(code: SubmitWyrErrorCode): string {
     case 'ROUND_NOT_ACCEPTING_SUBMISSIONS': return 'Esta ronda ya no acepta respuestas.';
     case 'PROMPT_OPTIONS_CORRUPTED': return 'La pregunta tiene opciones incompletas. El host puede avanzar y probar otra ronda.';
     case 'INVALID_CHOICE': return 'Esa opción no es válida para esta pregunta.';
+  }
+}
+
+function mapSubmitMostLikelyError(code: SubmitMostLikelyErrorCode): string {
+  switch (code) {
+    case 'PARTICIPANT_NOT_IN_ROOM': return 'No pudimos validar tu participación activa en esta sala.';
+    case 'ROUND_NOT_FOUND': return 'No encontramos la ronda actual para registrar tu voto.';
+    case 'ROUND_NOT_CURRENT': return 'Esa ronda ya cambió. Actualiza la pantalla y seguimos.';
+    case 'ROUND_NOT_MOST_LIKELY': return 'Esta ronda no corresponde a Quién es más probable.';
+    case 'ROUND_NOT_ACCEPTING_SUBMISSIONS': return 'Esta ronda ya no acepta votos.';
+    case 'TARGET_NOT_IN_MATCH': return 'Ese participante ya no está disponible para votar en esta partida.';
   }
 }
 
@@ -498,5 +510,59 @@ export async function submitWouldYouRatherChoiceAction(_: SubmitChoiceActionStat
   );
 
   if (!result.ok) return { error: mapSubmitWyrError(result.code) };
+  return { ok: true, alreadySubmitted: result.alreadySubmitted };
+}
+
+
+export async function submitMostLikelyVoteAction(_: SubmitChoiceActionState, formData: FormData): Promise<SubmitChoiceActionState> {
+  const roomId = String(formData.get('roomId') ?? '');
+  const matchId = String(formData.get('matchId') ?? '');
+  const roundId = String(formData.get('roundId') ?? '');
+  const targetParticipantId = String(formData.get('targetParticipantId') ?? '').trim();
+  if (!roomId || !matchId || !roundId || !targetParticipantId) return { error: 'Falta información para enviar tu voto.' };
+
+  const actorParticipantId = await getActorParticipantId(roomId);
+  if (!actorParticipantId) return { error: 'No pudimos validar tu participación en la sala.' };
+
+  const supabase = getSupabaseServiceRoleClient();
+  const result = await submitMostLikelyVote(
+    {
+      async getContext({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, actorParticipantId: aActorParticipantId, targetParticipantId: aTargetParticipantId }) {
+        const [participantRes, targetRes, matchRes, roundRes] = await Promise.all([
+          supabase.from('room_participants').select('id').eq('id', aActorParticipantId).eq('room_id', aRoomId).is('left_at', null).maybeSingle(),
+          supabase.from('room_participants').select('id').eq('id', aTargetParticipantId).eq('room_id', aRoomId).is('left_at', null).maybeSingle(),
+          supabase.from('matches').select('id,current_round_id').eq('id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+          supabase.from('rounds').select('id,status,game_type').eq('id', aRoundId).eq('match_id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+        ]);
+
+        return {
+          participantExists: Boolean(participantRes.data),
+          targetExistsInMatch: Boolean(targetRes.data),
+          match: matchRes.data as never,
+          round: roundRes.data as never,
+        };
+      },
+      async insertSubmission({ roundId: aRoundId, matchId: aMatchId, roomId: aRoomId, participantId, targetParticipantId: aTargetParticipantId, now }) {
+        const { data } = await supabase
+          .from('round_submissions')
+          .upsert({
+            round_id: aRoundId,
+            match_id: aMatchId,
+            room_id: aRoomId,
+            participant_id: participantId,
+            submission_type: 'vote',
+            status: 'submitted',
+            value: { target_participant_id: aTargetParticipantId },
+            submitted_at: now,
+          }, { onConflict: 'round_id,participant_id', ignoreDuplicates: true })
+          .select('id')
+          .maybeSingle();
+        return { inserted: Boolean(data) };
+      },
+    },
+    { roomId, matchId, roundId, actorParticipantId, targetParticipantId },
+  );
+
+  if (!result.ok) return { error: mapSubmitMostLikelyError(result.code) };
   return { ok: true, alreadySubmitted: result.alreadySubmitted };
 }

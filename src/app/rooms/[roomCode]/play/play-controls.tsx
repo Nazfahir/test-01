@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { advanceRoundAction, lockRoundAction, revealRoundAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
+import { advanceRoundAction, lockRoundAction, revealRoundAction, submitMostLikelyVoteAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
 import { Button } from '@/components/ui/Button';
 
 type Props = {
@@ -14,13 +14,16 @@ type Props = {
   options: string[];
   isHost: boolean;
   hasSubmitted: boolean;
+  participants: { id: string; display_name: string | null }[];
+  actorParticipantId: string | null;
 };
 
-export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, question, options, isHost, hasSubmitted }: Props) {
+export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, question, options, isHost, hasSubmitted, participants, actorParticipantId }: Props) {
   const [lockState, lockFormAction] = useActionState(lockRoundAction, {});
   const [revealState, revealFormAction] = useActionState(revealRoundAction, {});
   const [advanceState, advanceFormAction] = useActionState(advanceRoundAction, {});
-  const [submitState, submitFormAction] = useActionState(submitWouldYouRatherChoiceAction, {});
+  const [submitWyrState, submitWyrFormAction] = useActionState(submitWouldYouRatherChoiceAction, {});
+  const [submitMostLikelyState, submitMostLikelyFormAction] = useActionState(submitMostLikelyVoteAction, {});
 
   return (
     <div className="space-y-3">
@@ -29,15 +32,36 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
           <p className="text-sm font-semibold text-slate-700">¿Qué prefieres?</p>
           <p className="text-sm text-slate-700">{question}</p>
           {roundStatus === 'question' && !hasSubmitted && options.length === 2 ? (
-            <form action={submitFormAction} className="space-y-2">
+            <form action={submitWyrFormAction} className="space-y-2">
               <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
               {options.map((option) => (
                 <Button key={option} type="submit" name="choiceKey" value={option} className="w-full">{option}</Button>
               ))}
             </form>
           ) : null}
-          {(hasSubmitted || submitState.ok) ? <p className="text-sm text-emerald-700">Respuesta enviada ✨</p> : null}
-          {submitState.error ? <p className="text-sm text-rose-600">{submitState.error}</p> : null}
+          {(hasSubmitted || submitWyrState.ok) ? <p className="text-sm text-emerald-700">Respuesta enviada ✨</p> : null}
+          {submitWyrState.error ? <p className="text-sm text-rose-600">{submitWyrState.error}</p> : null}
+        </div>
+      ) : null}
+
+      {gameType === 'most_likely_to' ? (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-700">¿Quién es más probable?</p>
+          <p className="text-sm text-slate-700">{question}</p>
+          <p className="text-xs text-slate-500">Tu voto queda oculto hasta reveal. Sí, te puedes votar a ti ✨</p>
+          {roundStatus === 'question' && !hasSubmitted ? (
+            <form action={submitMostLikelyFormAction} className="space-y-2">
+              <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
+              {participants.map((participant) => (
+                <Button key={participant.id} type="submit" name="targetParticipantId" value={participant.id} className="w-full">
+                  {participant.display_name ?? `Jugador ${participant.id.slice(0, 4)}`}
+                  {participant.id === actorParticipantId ? ' (Tú)' : ''}
+                </Button>
+              ))}
+            </form>
+          ) : null}
+          {(hasSubmitted || submitMostLikelyState.ok) ? <p className="text-sm text-emerald-700">Voto enviado ✨</p> : null}
+          {submitMostLikelyState.error ? <p className="text-sm text-rose-600">{submitMostLikelyState.error}</p> : null}
         </div>
       ) : null}
 

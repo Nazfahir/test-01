@@ -38,7 +38,7 @@ export default async function PlayPage({ params }: { params: Promise<{ roomCode:
         <p className="text-sm text-slate-600">Estado: {round?.status ?? 'desconocido'}.</p>
         <p className="text-sm text-slate-600">Participantes activos: {participants?.length ?? 0}.</p>
       </Card>
-      {round ? <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} gameType={round.game_type} question={prompt?.content ?? 'Pregunta no disponible.'} options={options} isHost={isHost} hasSubmitted={Boolean(existingSubmission)} /> : null}
+      {round ? <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} gameType={round.game_type} question={prompt?.content ?? 'Pregunta no disponible.'} options={options} isHost={isHost} hasSubmitted={Boolean(existingSubmission)} participants={participants ?? []} actorParticipantId={actor?.id ?? null} /> : null}
     </main>
   );
 }
