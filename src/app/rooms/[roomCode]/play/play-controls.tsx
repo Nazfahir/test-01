@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { advanceRoundAction, lockRoundAction, revealRoundAction, submitMostLikelyVoteAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
+import { advanceRoundAction, lockRoundAction, revealRoundAction, submitMostLikelyVoteAction, submitNoRepeatAnswerAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
 import { Button } from '@/components/ui/Button';
 
 type Props = {
@@ -24,6 +24,7 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
   const [advanceState, advanceFormAction] = useActionState(advanceRoundAction, {});
   const [submitWyrState, submitWyrFormAction] = useActionState(submitWouldYouRatherChoiceAction, {});
   const [submitMostLikelyState, submitMostLikelyFormAction] = useActionState(submitMostLikelyVoteAction, {});
+  const [submitNoRepeatState, submitNoRepeatFormAction] = useActionState(submitNoRepeatAnswerAction, {});
 
   return (
     <div className="space-y-3">
@@ -65,6 +66,23 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
         </div>
       ) : null}
 
+
+      {gameType === 'dont_repeat' ? (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-700">No repitas</p>
+          <p className="text-sm text-slate-700">{question}</p>
+          <p className="text-xs text-slate-500">Ronda por turnos con timer: respuesta corta, sin artículos, sin acentos y en minúsculas.</p>
+          {roundStatus === 'question' && !hasSubmitted ? (
+            <form action={submitNoRepeatFormAction} className="space-y-2">
+              <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
+              <input type="text" name="text" maxLength={30} required placeholder="Tu respuesta (máx 30)" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <Button type="submit" className="w-full">Enviar respuesta</Button>
+            </form>
+          ) : null}
+          {(hasSubmitted || submitNoRepeatState.ok) ? <p className="text-sm text-emerald-700">Respuesta enviada ✨ Queda oculta hasta reveal.</p> : null}
+          {submitNoRepeatState.error ? <p className="text-sm text-rose-600">{submitNoRepeatState.error}</p> : null}
+        </div>
+      ) : null}
       {isHost ? (
         <>
           <p className="text-sm text-slate-700">Control host: avanza la ronda paso a paso para mantener todo ordenado.</p>
