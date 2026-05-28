@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
 import { startMatchAction, updateSelectedModeAction } from '@/features/rooms/actions';
 import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 
 type Props = {
   roomCode: string;
@@ -96,7 +97,7 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           <p>Participantes activos: {activeParticipants.length} / {state.room.max_players} (mínimo {state.room.min_players})</p>
           <p className="font-medium">{startStatus.reason}</p>
           <p className="break-all">Link de invitación: <span className="font-medium">{inviteLink}</span></p>
-          {connectionMessage ? <p className="text-xs text-amber-600">{connectionMessage}</p> : null}
+          {connectionMessage ? <ErrorNotice code="CONNECTION_LOST" /> : null}
         </div>
       </Card>
 

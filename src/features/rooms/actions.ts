@@ -13,6 +13,8 @@ import { submitNoRepeatAnswer, type SubmitNoRepeatErrorCode } from '@/features/r
 import { buildRoundReveal } from '@/features/rooms/reveal';
 import { scoreMatchCompletion, scoreRoundReveal } from '@/features/relationships/persist';
 import { grantMatchCurrency, grantRoundCurrency } from '@/features/currency/persist';
+import { getErrorUX } from '@/features/errors/catalog';
+import { mapJoinValidationErrorToCode, mapRoundErrorToCode, mapStartMatchErrorToCode } from '@/features/errors/mappers';
 
 type RoomsActionState = { error?: string };
 
@@ -168,7 +170,7 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
       hasActiveParticipant: Boolean(existingParticipant.data?.id),
     });
 
-    if (validation) return { error: mapJoinError(validation) };
+    if (validation) return { error: getErrorUX(mapJoinValidationErrorToCode(validation)).description };
 
     if (!existingParticipant.data?.id) {
       const resolvedGuestSessionId = userId ? null : await upsertGuest(displayName || 'Invitado Orbitas');

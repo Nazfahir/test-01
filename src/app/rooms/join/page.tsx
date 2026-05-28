@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { joinRoomAction } from '@/features/rooms/actions';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 
 export default function JoinRoomPage() {
   const [state, formAction, isPending] = useActionState(joinRoomAction, {});
@@ -27,7 +28,8 @@ export default function JoinRoomPage() {
           </label>
           <Input id="displayName" name="displayName" placeholder="¿Cómo te llamamos en la sala?" />
 
-          {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
+          {state.error ? <ErrorNotice code="UNKNOWN" /> : null}
+          {state.error ? <p className="text-xs text-gray-600">{state.error}</p> : null}
 
           <Button type="submit" disabled={isPending}>
             {isPending ? 'Uniéndote...' : 'Entrar al lobby'}

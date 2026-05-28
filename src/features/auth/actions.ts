@@ -5,6 +5,7 @@ import { getSupabaseServerClient, getSupabaseServiceRoleClient } from '@/lib/sup
 import { validateLoginInput, validateRegisterInput } from '@/features/auth/validation';
 import { getGuestSessionIdFromCookie } from '@/features/guests/session';
 import { convertGuestProgress } from '@/features/guests/convert-progress';
+import { getErrorUX } from '@/features/errors/catalog';
 
 export type AuthFormState = {
   status: 'idle' | 'success' | 'error';
@@ -61,7 +62,7 @@ export async function registerAction(_: AuthFormState, formData: FormData): Prom
       console.error('guest_conversion_partial_failure', { guestSessionId, userId: data.user.id });
       return {
         status: 'success',
-        message: 'Tu cuenta ya está creada 🎉 Aún no logramos guardar tu progreso, pero puedes reintentar desde resultados.',
+        message: getErrorUX('GUEST_CONVERSION_FAILED').description,
       };
     }
 
