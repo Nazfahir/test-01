@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { advanceRoundAction, lockRoundAction, revealRoundAction, submitMostLikelyVoteAction, submitNoRepeatAnswerAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
 import { Button } from '@/components/ui/Button';
+import type { RoundRevealPayload } from '@/features/rooms/reveal';
 
 type Props = {
   roomId: string;
@@ -16,9 +17,10 @@ type Props = {
   hasSubmitted: boolean;
   participants: { id: string; display_name: string | null }[];
   actorParticipantId: string | null;
+  revealSnapshot: RoundRevealPayload | null;
 };
 
-export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, question, options, isHost, hasSubmitted, participants, actorParticipantId }: Props) {
+export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, question, options, isHost, hasSubmitted, participants, actorParticipantId, revealSnapshot }: Props) {
   const [lockState, lockFormAction] = useActionState(lockRoundAction, {});
   const [revealState, revealFormAction] = useActionState(revealRoundAction, {});
   const [advanceState, advanceFormAction] = useActionState(advanceRoundAction, {});
@@ -83,6 +85,26 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
           {submitNoRepeatState.error ? <p className="text-sm text-rose-600">{submitNoRepeatState.error}</p> : null}
         </div>
       ) : null}
+
+      {roundStatus === 'reveal' && revealSnapshot ? (
+        <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-800">Resultados de la ronda 🎉</p>
+          {revealSnapshot.game_type === 'would_you_rather' ? revealSnapshot.by_option.map((group) => (
+            <p key={group.option} className="text-sm text-emerald-900">{group.option}: {group.count}</p>
+          )) : null}
+          {revealSnapshot.game_type === 'most_likely_to' ? revealSnapshot.distribution.map((item) => (
+            <p key={item.target_participant_id} className="text-sm text-emerald-900">{item.display_name}: {item.votes} votos</p>
+          )) : null}
+          {revealSnapshot.game_type === 'dont_repeat' ? (
+            <>
+              <p className="text-sm text-emerald-900">Únicas: {revealSnapshot.unique_answers.length}</p>
+              <p className="text-sm text-emerald-900">Repetidas: {revealSnapshot.repeated_groups.length}</p>
+            </>
+          ) : null}
+          {revealSnapshot.skipped.length > 0 ? <p className="text-xs text-emerald-700">Sin respuesta: {revealSnapshot.skipped.map((s) => s.display_name).join(', ')}</p> : null}
+        </div>
+      ) : null}
+
       {isHost ? (
         <>
           <p className="text-sm text-slate-700">Control host: avanza la ronda paso a paso para mantener todo ordenado.</p>
