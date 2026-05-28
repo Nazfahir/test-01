@@ -3,6 +3,7 @@ import { getGuestSessionIdFromCookie } from '@/features/guests/session';
 import { getSupabaseServerClient } from '@/lib/supabaseServer';
 import { getSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 import { PlayControls } from './play-controls';
+import { PlayRealtimeClient } from './play-realtime-client';
 import type { RoundRevealPayload } from '@/features/rooms/reveal';
 
 export default async function PlayPage({ params }: { params: Promise<{ roomCode: string }> }) {
@@ -41,7 +42,11 @@ export default async function PlayPage({ params }: { params: Promise<{ roomCode:
         <p className="text-sm text-slate-600">Estado: {round?.status ?? 'desconocido'}.</p>
         <p className="text-sm text-slate-600">Participantes activos: {participants?.length ?? 0}.</p>
       </Card>
-      {round ? <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} gameType={round.game_type} question={prompt?.content ?? 'Pregunta no disponible.'} options={options} isHost={isHost} hasSubmitted={Boolean(existingSubmission)} participants={participants ?? []} actorParticipantId={actor?.id ?? null} revealSnapshot={revealSnapshot} /> : null}
+      {round ? (
+        <PlayRealtimeClient roomId={room.id} hostParticipantId={room.host_participant_id} actorParticipantId={actor?.id ?? null}>
+          <PlayControls roomId={room.id} matchId={match.id} roundId={round.id} roundStatus={round.status} gameType={round.game_type} question={prompt?.content ?? 'Pregunta no disponible.'} options={options} isHost={isHost} hasSubmitted={Boolean(existingSubmission)} participants={participants ?? []} actorParticipantId={actor?.id ?? null} revealSnapshot={revealSnapshot} />
+        </PlayRealtimeClient>
+      ) : null}
     </main>
   );
 }
