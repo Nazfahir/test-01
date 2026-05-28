@@ -20,7 +20,7 @@ export default async function LobbyPage({ params }: { params: Promise<{ roomCode
     .maybeSingle();
 
   if (!room) {
-    return <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">Sala no encontrada.</main>;
+    return <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">No encontramos esa sala. Revisa el código y vuelve a intentar.</main>;
   }
 
   const { data: participants } = await supabase
@@ -46,8 +46,8 @@ export default async function LobbyPage({ params }: { params: Promise<{ roomCode
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
-      <h1 className="text-2xl font-bold text-primary">Lobby de sala</h1>
-      <p className="text-sm text-gray-600">Todo listo. Comparte y esperen al resto del grupo 🚀</p>
+      <h1 className="text-2xl font-bold text-primary">Lobby de la sala</h1>
+      <p className="text-sm text-gray-600">Todo listo. Compartan el acceso y esperen al resto con calma ✨</p>
 
       <LobbyRealtimeClient
         roomCode={normalizedRoomCode}
@@ -58,7 +58,7 @@ export default async function LobbyPage({ params }: { params: Promise<{ roomCode
       />
 
       <Card>
-        <p className="text-xs text-gray-500">QR: placeholder técnico (pendiente render visual).</p>
+        <p className="text-xs text-gray-500">Código QR disponible pronto. Mientras tanto, usa código o link de invitación.</p>
       </Card>
 
       <Link className="text-sm font-medium text-primary underline" href="/rooms/join">

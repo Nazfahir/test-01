@@ -1,0 +1,30 @@
+export const uxCopy = {
+  home: {
+    title: 'Orbitas',
+    subtitle: 'Una sala rápida, 3 rondas y más conexión con tu gente ✨',
+    registerCta: 'Crear cuenta local',
+    loginCta: 'Entrar con cuenta',
+    profileCta: 'Ir a mi perfil',
+  },
+  auth: {
+    registerTitle: 'Crea tu cuenta en Orbitas',
+    loginTitle: 'Qué lindo verte de nuevo',
+    pending: 'Preparando todo…',
+    registerHint: 'Tu nombre se verá en sala. Puedes cambiarlo después.',
+    registerLinkPrompt: '¿Ya tienes cuenta?',
+    registerLinkCta: 'Entrar ahora',
+    loginLinkPrompt: '¿Primera vuelta por Orbitas?',
+    loginLinkCta: 'Crear cuenta local',
+  },
+  room: {
+    joinTitle: 'Unirte a una sala',
+    joinSubtitle: 'Pega código o link y te sumas al lobby en segundos 🌟',
+    joinPending: 'Entrando al lobby…',
+    joinCta: 'Entrar al lobby',
+    createTitle: 'Crear sala',
+    createSubtitle: 'Abre una sala, comparte el código y empiecen cuando estén listos ✨',
+    createPending: 'Creando tu sala…',
+    createCta: 'Crear sala',
+    guestNameHelp: 'Tu nombre visible (si entras como invitado)',
+  },
+} as const;

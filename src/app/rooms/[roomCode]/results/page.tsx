@@ -33,7 +33,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ roomCo
   );
 
   if (!allowed) {
-    return <main className="mx-auto max-w-md p-4">Acceso restringido. Estos resultados son solo para participantes de la sala.</main>;
+    return <main className="mx-auto max-w-md p-4">Resultados privados: solo quienes participaron en esta sala pueden verlos.</main>;
   }
 
   const { data: match } = await service
@@ -44,7 +44,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ roomCo
     .limit(1)
     .maybeSingle();
 
-  if (!match) return <main className="mx-auto max-w-md p-4">Todavía no hay una partida para mostrar.</main>;
+  if (!match) return <main className="mx-auto max-w-md p-4">Aún no hay partida cerrada para mostrar.</main>;
   if (match.status !== 'finished') return <main className="mx-auto max-w-md p-4">La partida sigue en curso. Vuelvan cuando cierre la ronda final ✨</main>;
 
   const [eventsRes, currencyRes] = await Promise.all([
@@ -94,7 +94,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ roomCo
       </section>
 
       <section className="rounded-xl bg-slate-900 p-4">
-        <h2 className="text-lg font-semibold">Monedas ganadas</h2>
+        <h2 className="text-lg font-semibold">Monedas de esta partida</h2>
         <p className="mt-1 text-xl font-bold">+{currency.total}</p>
         <ul className="mt-2 space-y-2 text-sm">
           {currency.breakdown.map((item) => <li key={item.sourceType} className="rounded-md bg-slate-800 px-2 py-1">+{item.amount} · {SOURCE_LABELS[item.sourceType] ?? item.sourceType}</li>)}
@@ -109,7 +109,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ roomCo
       </section>
 
       <section className="flex items-center justify-between gap-3">
-        <Link href={`/rooms/${room.room_code}/lobby`} className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900">Volver a la sala</Link>
+        <Link href={`/rooms/${room.room_code}/lobby`} className="rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-900">Volver al lobby</Link>
         <span className="text-xs text-slate-400">Próximamente: jugar otra partida 🚀</span>
       </section>
     </main>

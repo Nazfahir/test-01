@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { initialAuthState, registerAction } from '@/features/auth/actions';
 import { getSupabaseServerClient } from '@/lib/supabaseServer';
+import { uxCopy } from '@/copy/ux';
 
 export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const supabase = await getSupabaseServerClient();
@@ -14,5 +15,5 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
   const { next } = await searchParams;
   const safeNext = next?.startsWith('/') ? next : '/auth/login';
 
-  return <AuthForm title="Crear cuenta Orbitas" submitLabel="Crear cuenta" mode="register" action={registerAction} initialState={initialAuthState} successRedirectTo={safeNext} />;
+  return <AuthForm title={uxCopy.auth.registerTitle} submitLabel="Crear cuenta" mode="register" action={registerAction} initialState={initialAuthState} successRedirectTo={safeNext} />;
 }
