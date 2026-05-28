@@ -9,6 +9,7 @@ import { startMatch, type RoundGameType, type StartMatchErrorCode } from '@/feat
 import { transitionRound, type RoundFlowErrorCode } from '@/features/rooms/round-flow';
 import { submitWouldYouRatherChoice, type SubmitWyrErrorCode } from '@/features/rooms/submit-wyr';
 import { submitMostLikelyVote, type SubmitMostLikelyErrorCode } from '@/features/rooms/submit-most-likely';
+import { submitNoRepeatAnswer, type SubmitNoRepeatErrorCode } from '@/features/rooms/submit-no-repeat';
 
 type RoomsActionState = { error?: string };
 
@@ -230,6 +231,19 @@ function mapSubmitMostLikelyError(code: SubmitMostLikelyErrorCode): string {
     case 'ROUND_NOT_MOST_LIKELY': return 'Esta ronda no corresponde a Quién es más probable.';
     case 'ROUND_NOT_ACCEPTING_SUBMISSIONS': return 'Esta ronda ya no acepta votos.';
     case 'TARGET_NOT_IN_MATCH': return 'Ese participante ya no está disponible para votar en esta partida.';
+  }
+}
+
+
+function mapSubmitNoRepeatError(code: SubmitNoRepeatErrorCode): string {
+  switch (code) {
+    case 'PARTICIPANT_NOT_IN_ROOM': return 'No pudimos validar tu participación activa en esta sala.';
+    case 'ROUND_NOT_FOUND': return 'No encontramos la ronda actual para registrar tu respuesta.';
+    case 'ROUND_NOT_CURRENT': return 'Esa ronda ya cambió. Actualiza la pantalla y seguimos.';
+    case 'ROUND_NOT_NO_REPEAT': return 'Esta ronda no corresponde a No repitas.';
+    case 'ROUND_NOT_ACCEPTING_SUBMISSIONS': return 'Esta ronda ya no acepta respuestas.';
+    case 'EMPTY_TEXT': return 'Tu respuesta quedó vacía. Escribe algo corto y divertido.';
+    case 'TEXT_TOO_LONG': return 'Máximo 30 caracteres en No repitas.';
   }
 }
 
@@ -564,5 +578,57 @@ export async function submitMostLikelyVoteAction(_: SubmitChoiceActionState, for
   );
 
   if (!result.ok) return { error: mapSubmitMostLikelyError(result.code) };
+  return { ok: true, alreadySubmitted: result.alreadySubmitted };
+}
+
+
+export async function submitNoRepeatAnswerAction(_: SubmitChoiceActionState, formData: FormData): Promise<SubmitChoiceActionState> {
+  const roomId = String(formData.get('roomId') ?? '');
+  const matchId = String(formData.get('matchId') ?? '');
+  const roundId = String(formData.get('roundId') ?? '');
+  const text = String(formData.get('text') ?? '');
+  if (!roomId || !matchId || !roundId) return { error: 'Falta información para enviar tu respuesta.' };
+
+  const actorParticipantId = await getActorParticipantId(roomId);
+  if (!actorParticipantId) return { error: 'No pudimos validar tu participación en la sala.' };
+
+  const supabase = getSupabaseServiceRoleClient();
+  const result = await submitNoRepeatAnswer(
+    {
+      async getContext({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, actorParticipantId: aActorParticipantId }) {
+        const [participantRes, matchRes, roundRes] = await Promise.all([
+          supabase.from('room_participants').select('id').eq('id', aActorParticipantId).eq('room_id', aRoomId).is('left_at', null).maybeSingle(),
+          supabase.from('matches').select('id,current_round_id').eq('id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+          supabase.from('rounds').select('id,status,game_type').eq('id', aRoundId).eq('match_id', aMatchId).eq('room_id', aRoomId).maybeSingle(),
+        ]);
+
+        return {
+          participantExists: Boolean(participantRes.data),
+          match: matchRes.data as never,
+          round: roundRes.data as never,
+        };
+      },
+      async insertSubmission({ roundId: aRoundId, matchId: aMatchId, roomId: aRoomId, participantId, rawText, normalizedText, now }) {
+        const { data } = await supabase
+          .from('round_submissions')
+          .upsert({
+            round_id: aRoundId,
+            match_id: aMatchId,
+            room_id: aRoomId,
+            participant_id: participantId,
+            submission_type: 'text_answer',
+            status: 'submitted',
+            value: { raw_text: rawText, normalized_text: normalizedText },
+            submitted_at: now,
+          }, { onConflict: 'round_id,participant_id', ignoreDuplicates: true })
+          .select('id')
+          .maybeSingle();
+        return { inserted: Boolean(data) };
+      },
+    },
+    { roomId, matchId, roundId, actorParticipantId, text },
+  );
+
+  if (!result.ok) return { error: mapSubmitNoRepeatError(result.code) };
   return { ok: true, alreadySubmitted: result.alreadySubmitted };
 }
