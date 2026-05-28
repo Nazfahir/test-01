@@ -18,6 +18,19 @@ describe('env helpers', () => {
     expect(getPublicEnv()).toEqual({
       supabaseUrl: 'https://example.supabase.co',
       supabaseAnonKey: 'anon-key',
+      appUrl: undefined,
+    });
+  });
+
+  it('returns optional app url when present', () => {
+    process.env[envKeys.NEXT_PUBLIC_SUPABASE_URL] = 'https://example.supabase.co';
+    process.env[envKeys.NEXT_PUBLIC_SUPABASE_ANON_KEY] = 'anon-key';
+    process.env[envKeys.NEXT_PUBLIC_APP_URL] = 'https://orbitas.example';
+
+    expect(getPublicEnv()).toEqual({
+      supabaseUrl: 'https://example.supabase.co',
+      supabaseAnonKey: 'anon-key',
+      appUrl: 'https://orbitas.example',
     });
   });
 
