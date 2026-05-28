@@ -10,6 +10,7 @@ import { transitionRound, type RoundFlowErrorCode } from '@/features/rooms/round
 import { submitWouldYouRatherChoice, type SubmitWyrErrorCode } from '@/features/rooms/submit-wyr';
 import { submitMostLikelyVote, type SubmitMostLikelyErrorCode } from '@/features/rooms/submit-most-likely';
 import { submitNoRepeatAnswer, type SubmitNoRepeatErrorCode } from '@/features/rooms/submit-no-repeat';
+import { buildRoundReveal } from '@/features/rooms/reveal';
 
 type RoomsActionState = { error?: string };
 
@@ -435,8 +436,33 @@ async function controlRoundAction(
         return Boolean(updated);
       },
       async updateRoundState({ roundId: aRoundId, expectedStatus, nextStatus, now }) {
-        const patch = nextStatus === 'reveal' ? { status: nextStatus, reveal_at: now } : { status: nextStatus };
-        const { data } = await supabase.from('rounds').update(patch).eq('id', aRoundId).eq('status', expectedStatus).select('id').maybeSingle();
+        const basePatch = nextStatus === 'reveal' ? { status: nextStatus, reveal_at: now } : { status: nextStatus };
+
+        if (nextStatus !== 'reveal') {
+          const { data } = await supabase.from('rounds').update(basePatch).eq('id', aRoundId).eq('status', expectedStatus).select('id').maybeSingle();
+          return Boolean(data);
+        }
+
+        const { data: round } = await supabase.from('rounds').select('game_type,prompt_id').eq('id', aRoundId).maybeSingle();
+        const { data: participants } = await supabase.from('room_participants').select('id,display_name').eq('room_id', roomId).is('left_at', null);
+        const { data: submissions } = await supabase.from('round_submissions').select('participant_id,status,submission_type,choice_key,value').eq('round_id', aRoundId);
+        const { data: prompt } = round?.prompt_id ? await supabase.from('prompts').select('options').eq('id', round.prompt_id).maybeSingle() : { data: null };
+
+        const options = Array.isArray(prompt?.options) ? prompt.options.filter((item): item is string => typeof item === 'string') : [];
+        const revealSnapshot = buildRoundReveal({
+          gameType: round?.game_type,
+          participants: participants ?? [],
+          submissions: submissions ?? [],
+          options,
+        });
+
+        const { data } = await supabase
+          .from('rounds')
+          .update({ ...basePatch, reveal_snapshot: revealSnapshot })
+          .eq('id', aRoundId)
+          .eq('status', expectedStatus)
+          .select('id')
+          .maybeSingle();
         return Boolean(data);
       },
       async completeRoundAndAdvance({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, roundOrder, now }) {
