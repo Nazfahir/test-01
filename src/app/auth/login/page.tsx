@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { initialAuthState, loginAction } from '@/features/auth/actions';
 import { getSupabaseServerClient } from '@/lib/supabaseServer';
+import { uxCopy } from '@/copy/ux';
 
 export default async function LoginPage() {
   const supabase = await getSupabaseServerClient();
@@ -11,5 +12,5 @@ export default async function LoginPage() {
     redirect('/');
   }
 
-  return <AuthForm title="Entrar a Orbitas" submitLabel="Iniciar sesión" mode="login" action={loginAction} initialState={initialAuthState} />;
+  return <AuthForm title={uxCopy.auth.loginTitle} submitLabel="Entrar" mode="login" action={loginAction} initialState={initialAuthState} />;
 }

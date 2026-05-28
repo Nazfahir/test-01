@@ -13,7 +13,7 @@ export function JoinRoomGuestForm() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold text-primary">Unirte a una sala</h1>
-      <p className="text-sm text-gray-600">Entra como invitado, elige tu nombre y arranquen juntos ✨</p>
+      <p className="text-sm text-gray-600">Entra como invitado, elige tu nombre y súmate al grupo ✨</p>
 
       <Card>
         <form action={formAction} className="space-y-3">
@@ -30,7 +30,7 @@ export function JoinRoomGuestForm() {
           {state.error ? <p className="text-sm text-red-600">{state.error}</p> : null}
 
           <Button type="submit" disabled={isPending}>
-            {isPending ? 'Uniéndote...' : 'Entrar como invitado'}
+            {isPending ? 'Entrando…' : 'Entrar como invitado'}
           </Button>
         </form>
       </Card>

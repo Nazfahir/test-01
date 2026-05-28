@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import type { AuthFormState } from '@/features/auth/actions';
+import { uxCopy } from '@/copy/ux';
 
 type Props = {
   title: string;
@@ -35,6 +36,7 @@ export function AuthForm({ title, submitLabel, mode, action, initialState, succe
           <label className="block text-sm text-gray-700">
             Nombre visible
             <Input name="display_name" autoComplete="nickname" required minLength={2} />
+            <span className="mt-1 block text-xs text-gray-500">{uxCopy.auth.registerHint}</span>
           </label>
         ) : null}
 
@@ -59,13 +61,13 @@ export function AuthForm({ title, submitLabel, mode, action, initialState, succe
         ) : null}
 
         <Button type="submit" disabled={pending}>
-          {pending ? 'Un momento…' : submitLabel}
+          {pending ? uxCopy.auth.pending : submitLabel}
         </Button>
 
         <p className="text-sm text-gray-600">
-          {mode === 'login' ? '¿Primera vez por aquí?' : '¿Ya tienes cuenta?'}{' '}
+          {mode === 'login' ? uxCopy.auth.loginLinkPrompt : uxCopy.auth.registerLinkPrompt}{' '}
           <Link className="font-semibold text-primary" href={mode === 'login' ? '/auth/register' : '/auth/login'}>
-            {mode === 'login' ? 'Crear cuenta' : 'Ir a login'}
+            {mode === 'login' ? uxCopy.auth.loginLinkCta : uxCopy.auth.registerLinkCta}
           </Link>
         </p>
       </form>

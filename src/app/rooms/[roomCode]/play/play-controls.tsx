@@ -42,7 +42,7 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
               ))}
             </form>
           ) : null}
-          {(hasSubmitted || submitWyrState.ok) ? <p className="text-sm text-emerald-700">Respuesta enviada ✨</p> : null}
+          {(hasSubmitted || submitWyrState.ok) ? <p className="text-sm text-emerald-700">Listo, respuesta enviada ✨</p> : null}
           {submitWyrState.error ? <p className="text-sm text-rose-600">{submitWyrState.error}</p> : null}
         </div>
       ) : null}
@@ -63,7 +63,7 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
               ))}
             </form>
           ) : null}
-          {(hasSubmitted || submitMostLikelyState.ok) ? <p className="text-sm text-emerald-700">Voto enviado ✨</p> : null}
+          {(hasSubmitted || submitMostLikelyState.ok) ? <p className="text-sm text-emerald-700">Listo, voto enviado ✨</p> : null}
           {submitMostLikelyState.error ? <p className="text-sm text-rose-600">{submitMostLikelyState.error}</p> : null}
         </div>
       ) : null}
@@ -73,7 +73,7 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
         <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm font-semibold text-slate-700">No repitas</p>
           <p className="text-sm text-slate-700">{question}</p>
-          <p className="text-xs text-slate-500">Ronda por turnos con timer: respuesta corta, sin artículos, sin acentos y en minúsculas.</p>
+          <p className="text-xs text-slate-500">Ronda por turnos: respuesta corta en minúsculas, sin acentos ni artículos.</p>
           {roundStatus === 'question' && !hasSubmitted ? (
             <form action={submitNoRepeatFormAction} className="space-y-2">
               <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
@@ -81,14 +81,14 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
               <Button type="submit" className="w-full">Enviar respuesta</Button>
             </form>
           ) : null}
-          {(hasSubmitted || submitNoRepeatState.ok) ? <p className="text-sm text-emerald-700">Respuesta enviada ✨ Queda oculta hasta reveal.</p> : null}
+          {(hasSubmitted || submitNoRepeatState.ok) ? <p className="text-sm text-emerald-700">Listo, respuesta enviada ✨ Queda oculta hasta reveal.</p> : null}
           {submitNoRepeatState.error ? <p className="text-sm text-rose-600">{submitNoRepeatState.error}</p> : null}
         </div>
       ) : null}
 
       {roundStatus === 'reveal' && revealSnapshot ? (
         <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-800">Resultados de la ronda 🎉</p>
+          <p className="text-sm font-semibold text-emerald-800">Así quedó esta ronda 🎉</p>
           {revealSnapshot.game_type === 'would_you_rather' ? revealSnapshot.by_option.map((group) => (
             <p key={group.option} className="text-sm text-emerald-900">{group.option}: {group.count}</p>
           )) : null}
@@ -101,17 +101,17 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
               <p className="text-sm text-emerald-900">Repetidas: {revealSnapshot.repeated_groups.length}</p>
             </>
           ) : null}
-          {revealSnapshot.skipped.length > 0 ? <p className="text-xs text-emerald-700">Sin respuesta: {revealSnapshot.skipped.map((s) => s.display_name).join(', ')}</p> : null}
+          {revealSnapshot.skipped.length > 0 ? <p className="text-xs text-emerald-700">Se saltaron esta ronda: {revealSnapshot.skipped.map((s) => s.display_name).join(', ')}</p> : null}
         </div>
       ) : null}
 
       {isHost ? (
         <>
-          <p className="text-sm text-slate-700">Control host: avanza la ronda paso a paso para mantener todo ordenado.</p>
+          <p className="text-sm text-slate-700">Host: avanza paso a paso para que el grupo siga sincronizado.</p>
           {roundStatus === 'question' && (
             <form action={lockFormAction}>
               <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
-              <Button type="submit">Cerrar respuestas (lock)</Button>
+              <Button type="submit">Cerrar respuestas</Button>
               {lockState.error ? <p className="text-sm text-rose-600">{lockState.error}</p> : null}
             </form>
           )}
@@ -125,12 +125,12 @@ export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, 
           {roundStatus === 'reveal' && (
             <form action={advanceFormAction}>
               <input type="hidden" name="roomId" value={roomId} /><input type="hidden" name="matchId" value={matchId} /><input type="hidden" name="roundId" value={roundId} />
-              <Button type="submit">Finalizar ronda y avanzar</Button>
+              <Button type="submit">Pasar a la siguiente ronda</Button>
               {advanceState.error ? <p className="text-sm text-rose-600">{advanceState.error}</p> : null}
             </form>
           )}
         </>
-      ) : <p className="text-sm text-slate-600">Esperando al host para avanzar de ronda ✨</p>}
+      ) : <p className="text-sm text-slate-600">Esperando a que el host avance la ronda ✨</p>}
     </div>
   );
 }
