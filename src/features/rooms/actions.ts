@@ -11,6 +11,7 @@ import { submitWouldYouRatherChoice, type SubmitWyrErrorCode } from '@/features/
 import { submitMostLikelyVote, type SubmitMostLikelyErrorCode } from '@/features/rooms/submit-most-likely';
 import { submitNoRepeatAnswer, type SubmitNoRepeatErrorCode } from '@/features/rooms/submit-no-repeat';
 import { buildRoundReveal } from '@/features/rooms/reveal';
+import { scoreMatchCompletion, scoreRoundReveal } from '@/features/relationships/persist';
 
 type RoomsActionState = { error?: string };
 
@@ -461,8 +462,11 @@ async function controlRoundAction(
           .update({ ...basePatch, reveal_snapshot: revealSnapshot })
           .eq('id', aRoundId)
           .eq('status', expectedStatus)
-          .select('id')
+          .select('id,game_type')
           .maybeSingle();
+        if (data) {
+          await scoreRoundReveal(supabase, { roomId, matchId, roundId: aRoundId, gameType: data.game_type });
+        }
         return Boolean(data);
       },
       async completeRoundAndAdvance({ roomId: aRoomId, matchId: aMatchId, roundId: aRoundId, roundOrder, now }) {
@@ -471,6 +475,7 @@ async function controlRoundAction(
         if (roundOrder >= 3) {
           await supabase.from('matches').update({ status: 'finished', finished_at: now, current_round_id: null }).eq('id', aMatchId);
           await supabase.from('rooms').update({ status: 'results', finished_at: now }).eq('id', aRoomId);
+          await scoreMatchCompletion(supabase, { roomId: aRoomId, matchId: aMatchId });
           return { nextRoundId: null, matchFinished: true };
         }
         const { data: nextRound } = await supabase.from('rounds').update({ status: 'question', started_at: now }).eq('match_id', aMatchId).eq('round_order', roundOrder + 1).eq('status', 'waiting').select('id').maybeSingle();
