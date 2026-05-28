@@ -3,6 +3,8 @@
 import { redirect } from 'next/navigation';
 import { getSupabaseServerClient, getSupabaseServiceRoleClient } from '@/lib/supabaseServer';
 import { validateLoginInput, validateRegisterInput } from '@/features/auth/validation';
+import { getGuestSessionIdFromCookie } from '@/features/guests/session';
+import { convertGuestProgress } from '@/features/guests/convert-progress';
 
 export type AuthFormState = {
   status: 'idle' | 'success' | 'error';
@@ -29,6 +31,7 @@ export async function registerAction(_: AuthFormState, formData: FormData): Prom
   }
 
   const service = getSupabaseServiceRoleClient();
+  const guestSessionId = await getGuestSessionIdFromCookie();
   const { error: profileError } = await service.from('profiles').upsert(
     {
       id: data.user.id,
@@ -45,7 +48,27 @@ export async function registerAction(_: AuthFormState, formData: FormData): Prom
     };
   }
 
-  return { status: 'success', message: '¡Listo! Tu cuenta Orbitas ya está preparada.' };
+  if (guestSessionId) {
+    const conversion = await convertGuestProgress({
+      service,
+      guestSessionId,
+      requesterGuestSessionId: guestSessionId,
+      targetUserId: data.user.id,
+      eligibleHours: 24,
+    });
+
+    if (conversion.kind === 'failed_partial') {
+      console.error('guest_conversion_partial_failure', { guestSessionId, userId: data.user.id });
+      return {
+        status: 'success',
+        message: 'Tu cuenta ya está creada 🎉 Aún no logramos guardar tu progreso, pero puedes reintentar desde resultados.',
+      };
+    }
+
+    console.info('guest_conversion_result', { guestSessionId, userId: data.user.id, result: conversion.kind });
+  }
+
+  return { status: 'success', message: '¡Listo! Tu cuenta Orbitas ya está preparada y tu progreso reciente quedó guardado ✨' };
 }
 
 export async function loginAction(_: AuthFormState, formData: FormData): Promise<AuthFormState> {

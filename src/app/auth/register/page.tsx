@@ -3,7 +3,7 @@ import { AuthForm } from '@/components/auth/AuthForm';
 import { initialAuthState, registerAction } from '@/features/auth/actions';
 import { getSupabaseServerClient } from '@/lib/supabaseServer';
 
-export default async function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const supabase = await getSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
 
@@ -11,5 +11,8 @@ export default async function RegisterPage() {
     redirect('/');
   }
 
-  return <AuthForm title="Crear cuenta Orbitas" submitLabel="Crear cuenta" mode="register" action={registerAction} initialState={initialAuthState} />;
+  const { next } = await searchParams;
+  const safeNext = next?.startsWith('/') ? next : '/auth/login';
+
+  return <AuthForm title="Crear cuenta Orbitas" submitLabel="Crear cuenta" mode="register" action={registerAction} initialState={initialAuthState} successRedirectTo={safeNext} />;
 }
