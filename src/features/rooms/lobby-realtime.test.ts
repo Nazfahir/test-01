@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveConnectionStatus, mergeParticipantEvent, normalizeParticipants, type LobbyState } from '@/features/rooms/lobby-realtime';
+import { deriveConnectionStatus, isHostDisconnected, mergeParticipantEvent, normalizeParticipants, type LobbyState } from '@/features/rooms/lobby-realtime';
 
 const baseRoom = { id: 'room-1', status: 'lobby', selected_mode: null, host_participant_id: 'p1', min_players: 3, max_players: 8 };
 
@@ -24,6 +24,20 @@ describe('lobby realtime state', () => {
     const next = mergeParticipantEvent(state, { id: 'p1', display_name: 'A', is_host: true, joined_at: '2026-01-01T00:00:01Z', left_at: null, connection_status: 'disconnected', last_seen_at: '2026-01-01T00:01:00Z' });
     expect(next.participants).toHaveLength(1);
     expect(next.participants[0].connection_status).toBe('disconnected');
+  });
+
+  it('ignora eventos viejos para evitar drift visual', () => {
+    const state: LobbyState = {
+      room: baseRoom,
+      participants: [{ id: 'p1', display_name: 'A', is_host: true, joined_at: '2026-01-01T00:00:01Z', left_at: null, connection_status: 'connected', last_seen_at: '2026-01-01T00:02:00Z', updated_at: '2026-01-01T00:02:00Z' }],
+    };
+
+    const next = mergeParticipantEvent(state, { id: 'p1', display_name: 'A', is_host: true, joined_at: '2026-01-01T00:00:01Z', left_at: null, connection_status: 'disconnected', last_seen_at: '2026-01-01T00:01:00Z', updated_at: '2026-01-01T00:01:00Z' });
+    expect(next.participants[0].connection_status).toBe('connected');
+  });
+
+  it('detecta host desconectado', () => {
+    expect(isHostDisconnected(baseRoom, [{ id: 'p1', display_name: 'A', is_host: true, joined_at: '', left_at: null, connection_status: 'disconnected', last_seen_at: '' }])).toBe(true);
   });
 
   it('deriva estado left cuando left_at existe', () => {

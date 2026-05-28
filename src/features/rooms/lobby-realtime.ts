@@ -10,6 +10,7 @@ export type LobbyParticipant = {
   left_at: string | null;
   connection_status: 'connected' | 'disconnected';
   last_seen_at: string;
+  updated_at?: string;
 };
 
 export type LobbyRoom = {
@@ -30,9 +31,22 @@ export function normalizeParticipants(participants: LobbyParticipant[]): LobbyPa
 }
 
 export function mergeParticipantEvent(state: LobbyState, incoming: LobbyParticipant): LobbyState {
+  const previous = state.participants.find((p) => p.id === incoming.id);
+  const prevUpdated = previous?.updated_at ?? previous?.last_seen_at ?? '';
+  const nextUpdated = incoming.updated_at ?? incoming.last_seen_at ?? '';
+  const shouldIgnore = previous && prevUpdated && nextUpdated && new Date(nextUpdated).getTime() < new Date(prevUpdated).getTime();
+  if (shouldIgnore) return state;
+
   const merged = state.participants.filter((p) => p.id !== incoming.id);
-  merged.push(incoming);
+  merged.push({ ...previous, ...incoming });
   return { ...state, participants: normalizeParticipants(merged) };
+}
+
+export function isHostDisconnected(room: LobbyRoom, participants: LobbyParticipant[]): boolean {
+  if (!room.host_participant_id) return false;
+  const host = participants.find((participant) => participant.id === room.host_participant_id);
+  if (!host) return true;
+  return !host.left_at && host.connection_status === 'disconnected';
 }
 
 export function deriveConnectionStatus(participant: LobbyParticipant): ConnectionStatus {

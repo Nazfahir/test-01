@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
 import { startMatchAction, updateSelectedModeAction } from '@/features/rooms/actions';
-import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
+import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, isHostDisconnected, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
 import { ErrorNotice } from '@/components/ui/ErrorNotice';
 
 type Props = {
@@ -88,6 +88,7 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
   const activeParticipants = useMemo(() => getActiveParticipants(state.participants), [state.participants]);
   const isHost = Boolean(currentParticipantId && currentParticipantId === state.room.host_participant_id);
   const startStatus = useMemo(() => getLobbyStartStatus(state.room, state.participants), [state.room, state.participants]);
+  const hostDisconnected = useMemo(() => isHostDisconnected(state.room, state.participants), [state.room, state.participants]);
 
   return (
     <>
@@ -98,6 +99,7 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           <p className="font-medium">{startStatus.reason}</p>
           <p className="break-all">Link de invitación: <span className="font-medium">{inviteLink}</span></p>
           {connectionMessage ? <ErrorNotice code="CONNECTION_LOST" /> : null}
+          {hostDisconnected ? <p className="text-xs text-amber-700">Host desconectado temporalmente. Espera su reconexión para continuar.</p> : null}
         </div>
       </Card>
 
@@ -138,7 +140,7 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           <form action={startAction}>
             <input type="hidden" name="roomId" value={state.room.id} />
             <input type="hidden" name="roomCode" value={roomCode} />
-            <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={!startStatus.canStart || startPending}>
+            <button className="w-full rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={!startStatus.canStart || startPending || hostDisconnected}>
               {startPending ? 'Iniciando…' : 'Iniciar partida'}
             </button>
           </form>
