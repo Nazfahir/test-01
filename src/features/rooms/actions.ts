@@ -12,6 +12,7 @@ import { submitMostLikelyVote, type SubmitMostLikelyErrorCode } from '@/features
 import { submitNoRepeatAnswer, type SubmitNoRepeatErrorCode } from '@/features/rooms/submit-no-repeat';
 import { buildRoundReveal } from '@/features/rooms/reveal';
 import { scoreMatchCompletion, scoreRoundReveal } from '@/features/relationships/persist';
+import { grantMatchCurrency, grantRoundCurrency } from '@/features/currency/persist';
 
 type RoomsActionState = { error?: string };
 
@@ -466,6 +467,7 @@ async function controlRoundAction(
           .maybeSingle();
         if (data) {
           await scoreRoundReveal(supabase, { roomId, matchId, roundId: aRoundId, gameType: data.game_type });
+          await grantRoundCurrency(supabase, { roomId, matchId, roundId: aRoundId, gameType: data.game_type });
         }
         return Boolean(data);
       },
@@ -476,6 +478,7 @@ async function controlRoundAction(
           await supabase.from('matches').update({ status: 'finished', finished_at: now, current_round_id: null }).eq('id', aMatchId);
           await supabase.from('rooms').update({ status: 'results', finished_at: now }).eq('id', aRoomId);
           await scoreMatchCompletion(supabase, { roomId: aRoomId, matchId: aMatchId });
+          await grantMatchCurrency(supabase, { roomId: aRoomId, matchId: aMatchId });
           return { nextRoundId: null, matchFinished: true };
         }
         const { data: nextRound } = await supabase.from('rounds').update({ status: 'question', started_at: now }).eq('match_id', aMatchId).eq('round_order', roundOrder + 1).eq('status', 'waiting').select('id').maybeSingle();
