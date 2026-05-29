@@ -7,9 +7,11 @@ const ENV_KEYS = {
   NEXT_PUBLIC_APP_URL: 'NEXT_PUBLIC_APP_URL',
 } as const;
 
-type PublicEnvKey =
-  | typeof ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL
-  | typeof ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+type PublicSupabaseEnv = {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  appUrl: string | undefined;
+};
 
 type PrivateEnvKey = typeof ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -32,12 +34,7 @@ function readOptionalString(name: string): string | undefined {
 function readRequiredEnv(name: PublicEnvKey | PrivateEnvKey): string {
   const value = process.env[name];
 
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable "${name}". ` +
-        'Add it to your .env.local before running Orbitas.',
-    );
-  }
+  if (!supabaseUrl || !supabaseAnonKey) return null;
 
   return value;
 }

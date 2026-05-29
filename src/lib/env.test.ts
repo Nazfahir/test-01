@@ -1,6 +1,6 @@
 import { envKeys, getOptionalPublicEnv, getPublicEnv, getServerSupabaseEnv, getServiceRoleKey, validatePublicEnv } from '@/lib/env';
 
-describe('env helpers', () => {
+describe('browser-safe env helpers', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
