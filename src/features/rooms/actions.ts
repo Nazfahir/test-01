@@ -31,10 +31,53 @@ function mapJoinError(error: JoinRoomValidationError): string {
   }
 }
 
-async function getCurrentUserId(): Promise<string | null> {
+type CurrentUser = { id: string; email?: string } | null;
+
+async function getCurrentUser(): Promise<CurrentUser> {
   const supabase = await getSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+
+  if (!data.user) return null;
+  return { id: data.user.id, email: data.user.email };
+}
+
+async function getCurrentUserId(): Promise<string | null> {
+  return (await getCurrentUser())?.id ?? null;
+}
+
+function fallbackDisplayNameForUser(user: NonNullable<CurrentUser>): string {
+  const emailName = user.email?.split('@')[0]?.trim();
+  return emailName || 'Jugador Orbitas';
+}
+
+async function ensureUserProfile(supabase: ReturnType<typeof getSupabaseServiceRoleClient>, user: NonNullable<CurrentUser>): Promise<string> {
+  const fallbackDisplayName = fallbackDisplayNameForUser(user);
+
+  const { data: existingProfile, error: selectError } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!selectError && existingProfile?.display_name?.trim()) {
+    return existingProfile.display_name.trim();
+  }
+
+  const { error: upsertError } = await supabase.from('profiles').upsert(
+    {
+      id: user.id,
+      display_name: fallbackDisplayName,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'id' },
+  );
+
+  if (upsertError) {
+    console.error('ensure_user_profile_failed', { code: upsertError.code, message: upsertError.message });
+    throw new Error('profile_upsert_error');
+  }
+
+  return fallbackDisplayName;
 }
 
 async function getActorParticipantId(roomId: string): Promise<string | null> {
@@ -77,12 +120,14 @@ export async function createRoomAction(_: RoomsActionState, formData: FormData):
   try {
     const supabase = getSupabaseServiceRoleClient();
     const displayName = String(formData.get('displayName') ?? '').trim();
-    const userId = await getCurrentUserId();
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
 
     if (!userId && !displayName) {
       return { error: 'Si entras como invitado, cuéntanos tu nombre visible para crear la sala.' };
     }
 
+    const participantDisplayName = currentUser ? await ensureUserProfile(supabase, currentUser) : displayName;
     const guestSessionId = userId ? null : await upsertGuest(displayName);
 
     let roomId = '';
@@ -92,13 +137,18 @@ export async function createRoomAction(_: RoomsActionState, formData: FormData):
       roomCode = generateRoomCode();
       const { data: room, error } = await supabase
         .from('rooms')
-        .insert({ room_code: roomCode, status: 'lobby', host_user_id: userId })
+        .insert({ room_code: roomCode, status: 'lobby' })
         .select('id, room_code')
         .single();
 
       if (!error && room) {
         roomId = room.id;
         roomCode = room.room_code;
+        break;
+      }
+
+      if (error?.code !== '23505') {
+        console.error('create_room_failed', { code: error?.code, message: error?.message });
         break;
       }
     }
@@ -111,13 +161,16 @@ export async function createRoomAction(_: RoomsActionState, formData: FormData):
         room_id: roomId,
         user_id: userId,
         guest_session_id: guestSessionId,
-        display_name: userId ? null : displayName,
+        display_name: participantDisplayName,
         is_host: true,
       })
       .select('id')
       .single();
 
-    if (participantError || !participant) return { error: 'Creamos la sala, pero falló el ingreso del host.' };
+    if (participantError || !participant) {
+      console.error('create_room_host_participant_failed', { code: participantError?.code, message: participantError?.message });
+      return { error: 'Creamos la sala, pero falló el ingreso del host.' };
+    }
 
     await supabase.from('rooms').update({ host_participant_id: participant.id }).eq('id', roomId);
 
@@ -139,7 +192,8 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
 
   try {
     const supabase = getSupabaseServiceRoleClient();
-    const userId = await getCurrentUserId();
+    const currentUser = await getCurrentUser();
+    const userId = currentUser?.id ?? null;
 
     const { data: room } = await supabase
       .from('rooms')
@@ -179,17 +233,23 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
     if (validation) return { error: getErrorUX(mapJoinValidationErrorToCode(validation)).description };
 
     if (!existingParticipant.data?.id) {
-      const resolvedGuestSessionId = userId ? null : await upsertGuest(displayName || 'Invitado Orbitas');
+      const participantDisplayName = currentUser
+        ? await ensureUserProfile(supabase, currentUser)
+        : displayName || 'Invitado Orbitas';
+      const resolvedGuestSessionId = userId ? null : await upsertGuest(participantDisplayName);
 
       const { error } = await supabase.from('room_participants').insert({
         room_id: room!.id,
         user_id: userId,
         guest_session_id: resolvedGuestSessionId,
-        display_name: userId ? null : displayName || 'Invitado Orbitas',
+        display_name: participantDisplayName,
         is_host: false,
       });
 
-      if (error) return { error: 'No pudimos sumarte a la sala. Inténtalo otra vez en unos segundos.' };
+      if (error) {
+        console.error('join_room_participant_failed', { code: error.code, message: error.message });
+        return { error: 'No pudimos sumarte a la sala. Inténtalo otra vez en unos segundos.' };
+      }
     }
 
     redirectTo = `/rooms/${room!.room_code}/lobby`;
