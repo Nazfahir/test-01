@@ -1,13 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { getPublicEnv, getServiceRoleKey } from '@/lib/env';
+import { getServerSupabaseEnv, getServiceRoleKey } from '@/lib/env';
 
 type CookieToSet = { name: string; value: string; options?: Record<string, unknown> };
 
 export async function getSupabaseServerClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
-  const { supabaseUrl, supabaseAnonKey } = getPublicEnv();
+  const { supabaseUrl, supabaseAnonKey } = getServerSupabaseEnv();
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -22,7 +22,7 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient> {
 }
 
 export function getSupabaseServiceRoleClient(): SupabaseClient {
-  const { supabaseUrl } = getPublicEnv();
+  const { supabaseUrl } = getServerSupabaseEnv();
   const serviceRoleKey = getServiceRoleKey();
 
   return createClient(supabaseUrl, serviceRoleKey, {
