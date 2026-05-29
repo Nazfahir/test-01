@@ -1,4 +1,4 @@
-import { envKeys, getOptionalPublicEnv, getPublicEnv, validatePublicEnv } from '@/lib/env';
+import { envKeys, getOptionalPublicEnv, getPublicEnv, getServerSupabaseEnv, getServiceRoleKey, validatePublicEnv } from '@/lib/env';
 
 describe('browser-safe env helpers', () => {
   const originalEnv = process.env;
@@ -39,11 +39,34 @@ describe('browser-safe env helpers', () => {
     });
   });
 
-  it('returns null instead of throwing when public env is incomplete', () => {
+  it('throws clear error when required public env is missing', () => {
     process.env[envKeys.NEXT_PUBLIC_SUPABASE_ANON_KEY] = 'anon-key';
 
-    expect(getPublicEnv()).toBeNull();
+    expect(() => getPublicEnv()).toThrow(
+      'Missing required environment variable "NEXT_PUBLIC_SUPABASE_URL"',
+    );
+  });
+
+  it('returns null optional public env instead of throwing when browser config is incomplete', () => {
+    process.env[envKeys.NEXT_PUBLIC_SUPABASE_ANON_KEY] = 'anon-key';
+
     expect(getOptionalPublicEnv()).toBeNull();
     expect(validatePublicEnv().isValid).toBe(false);
+  });
+
+  it('allows server-side supabase env to use private fallback names', () => {
+    process.env[envKeys.SUPABASE_URL] = 'https://server-only.supabase.co';
+    process.env[envKeys.SUPABASE_ANON_KEY] = 'server-anon-key';
+
+    expect(getServerSupabaseEnv()).toEqual({
+      supabaseUrl: 'https://server-only.supabase.co',
+      supabaseAnonKey: 'server-anon-key',
+    });
+  });
+
+  it('returns service role key only in server env helper', () => {
+    process.env[envKeys.SUPABASE_SERVICE_ROLE_KEY] = 'service-role-key';
+
+    expect(getServiceRoleKey()).toBe('service-role-key');
   });
 });
