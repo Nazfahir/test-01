@@ -1,10 +1,15 @@
-import { envKeys, getPublicEnv, getServiceRoleKey } from '@/lib/env';
+import { envKeys, getOptionalPublicEnv, getPublicEnv, validatePublicEnv } from '@/lib/env';
 
-describe('env helpers', () => {
+describe('browser-safe env helpers', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    delete process.env[envKeys.NEXT_PUBLIC_SUPABASE_URL];
+    delete process.env[envKeys.NEXT_PUBLIC_SUPABASE_ANON_KEY];
+    delete process.env[envKeys.SUPABASE_URL];
+    delete process.env[envKeys.SUPABASE_ANON_KEY];
+    delete process.env[envKeys.NEXT_PUBLIC_APP_URL];
   });
 
   afterAll(() => {
@@ -34,18 +39,11 @@ describe('env helpers', () => {
     });
   });
 
-  it('throws clear error when required public env is missing', () => {
-    delete process.env[envKeys.NEXT_PUBLIC_SUPABASE_URL];
+  it('returns null instead of throwing when public env is incomplete', () => {
     process.env[envKeys.NEXT_PUBLIC_SUPABASE_ANON_KEY] = 'anon-key';
 
-    expect(() => getPublicEnv()).toThrow(
-      'Missing required environment variable "NEXT_PUBLIC_SUPABASE_URL"',
-    );
-  });
-
-  it('returns service role key only in server env helper', () => {
-    process.env[envKeys.SUPABASE_SERVICE_ROLE_KEY] = 'service-role-key';
-
-    expect(getServiceRoleKey()).toBe('service-role-key');
+    expect(getPublicEnv()).toBeNull();
+    expect(getOptionalPublicEnv()).toBeNull();
+    expect(validatePublicEnv().isValid).toBe(false);
   });
 });

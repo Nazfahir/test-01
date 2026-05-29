@@ -6,7 +6,6 @@ import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
 import { Card } from '@/components/ui/Card';
 import { startMatchAction, updateSelectedModeAction } from '@/features/rooms/actions';
 import { deriveConnectionStatus, getActiveParticipants, getLobbyStartStatus, isHostDisconnected, mergeParticipantEvent, normalizeParticipants, type LobbyParticipant, type LobbyRoom, type LobbyState } from '@/features/rooms/lobby-realtime';
-import { ErrorNotice } from '@/components/ui/ErrorNotice';
 
 type Props = {
   roomCode: string;
@@ -29,6 +28,11 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setConnectionMessage('La sincronización en vivo no está configurada. La sala se creó, pero para ver cambios automáticos revisa las variables NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+
     let heartbeat: NodeJS.Timeout | undefined;
 
     const refreshSnapshot = async () => {
@@ -98,7 +102,7 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
           <p>Participantes activos: {activeParticipants.length} / {state.room.max_players} (mínimo {state.room.min_players})</p>
           <p className="font-medium">{startStatus.reason}</p>
           <p className="break-all">Link de invitación: <span className="font-medium">{inviteLink}</span></p>
-          {connectionMessage ? <ErrorNotice code="CONNECTION_LOST" /> : null}
+          {connectionMessage ? <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">{connectionMessage}</p> : null}
           {hostDisconnected ? <p className="text-xs text-amber-700">Host desconectado temporalmente. Espera su reconexión para continuar.</p> : null}
         </div>
       </Card>

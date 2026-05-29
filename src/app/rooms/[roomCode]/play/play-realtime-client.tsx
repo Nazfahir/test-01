@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabaseClient';
-import { ErrorNotice } from '@/components/ui/ErrorNotice';
 
 type Props = {
   roomId: string;
@@ -19,6 +18,10 @@ export function PlayRealtimeClient({ roomId, hostParticipantId, actorParticipant
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setConnectionMessage('La sincronización en vivo no está configurada. Puedes seguir viendo esta pantalla; revisa las variables NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY para activar actualizaciones automáticas.');
+      return;
+    }
 
     const refreshSnapshot = async () => {
       const [roomRes, matchRes, hostRes] = await Promise.all([
@@ -65,7 +68,7 @@ export function PlayRealtimeClient({ roomId, hostParticipantId, actorParticipant
 
   return (
     <div className="space-y-3">
-      {connectionMessage ? <ErrorNotice code="CONNECTION_LOST" /> : null}
+      {connectionMessage ? <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">{connectionMessage}</p> : null}
       {hostDisconnectedForActor ? <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">Host desconectado. El avance de ronda se pausa hasta que vuelva.</p> : null}
       {children}
     </div>

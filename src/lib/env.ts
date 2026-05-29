@@ -1,48 +1,54 @@
 const ENV_KEYS = {
   NEXT_PUBLIC_SUPABASE_URL: 'NEXT_PUBLIC_SUPABASE_URL',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  SUPABASE_URL: 'SUPABASE_URL',
+  SUPABASE_ANON_KEY: 'SUPABASE_ANON_KEY',
   SUPABASE_SERVICE_ROLE_KEY: 'SUPABASE_SERVICE_ROLE_KEY',
   NEXT_PUBLIC_APP_URL: 'NEXT_PUBLIC_APP_URL',
 } as const;
 
-type PublicEnvKey =
-  | typeof ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL
-  | typeof ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+type PublicSupabaseEnv = {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  appUrl: string | undefined;
+};
 
-type PrivateEnvKey = typeof ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY;
-
-function readOptionalEnv(name: typeof ENV_KEYS.NEXT_PUBLIC_APP_URL): string | undefined {
-  const value = process.env[name]?.trim();
+function readOptionalAppUrl(): string | undefined {
+  const value = process.env.NEXT_PUBLIC_APP_URL?.trim();
   return value || undefined;
 }
 
-function readRequiredEnv(name: PublicEnvKey | PrivateEnvKey): string {
-  const value = process.env[name];
+export function getOptionalPublicEnv(): PublicSupabaseEnv | null {
+  // Keep these as direct process.env references so Next.js can inline them into
+  // the browser bundle. Dynamic access like process.env[name] is not reliable
+  // for NEXT_PUBLIC_* values in client components.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable "${name}". ` +
-        'Add it to your .env.local before running Orbitas.',
-    );
-  }
+  if (!supabaseUrl || !supabaseAnonKey) return null;
 
-  return value;
-}
-
-export function getPublicEnv() {
   return {
-    supabaseUrl: readRequiredEnv(ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL),
-    supabaseAnonKey: readRequiredEnv(ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    appUrl: readOptionalEnv(ENV_KEYS.NEXT_PUBLIC_APP_URL),
+    supabaseUrl,
+    supabaseAnonKey,
+    appUrl: readOptionalAppUrl(),
   };
 }
 
-export function getServiceRoleKey() {
-  return readRequiredEnv(ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY);
+export function getPublicEnv(): PublicSupabaseEnv | null {
+  return getOptionalPublicEnv();
 }
 
 export function validatePublicEnv() {
-  const publicEnv = getPublicEnv();
+  const publicEnv = getOptionalPublicEnv();
+
+  if (!publicEnv) {
+    return {
+      isValid: false,
+      supabaseUrl: '',
+      supabaseAnonKey: '',
+      appUrl: readOptionalAppUrl(),
+    };
+  }
 
   return {
     isValid: true,
