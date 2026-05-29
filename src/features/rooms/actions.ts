@@ -72,6 +72,8 @@ async function upsertGuest(displayName: string): Promise<string> {
 }
 
 export async function createRoomAction(_: RoomsActionState, formData: FormData): Promise<RoomsActionState> {
+  let redirectTo: string | null = null;
+
   try {
     const supabase = getSupabaseServiceRoleClient();
     const displayName = String(formData.get('displayName') ?? '').trim();
@@ -119,13 +121,17 @@ export async function createRoomAction(_: RoomsActionState, formData: FormData):
 
     await supabase.from('rooms').update({ host_participant_id: participant.id }).eq('id', roomId);
 
-    redirect(`/rooms/${roomCode}/lobby`);
+    redirectTo = `/rooms/${roomCode}/lobby`;
   } catch {
     return { error: 'Tuvimos un problema de conexión. Vuelve a intentarlo en un momento.' };
   }
+
+  if (!redirectTo) return { error: 'No pudimos abrir el lobby de la sala. Intenta nuevamente.' };
+  redirect(redirectTo);
 }
 
 export async function joinRoomAction(_: RoomsActionState, formData: FormData): Promise<RoomsActionState> {
+  let redirectTo: string | null = null;
   const roomCode = String(formData.get('roomCode') ?? '').trim().toUpperCase();
   const displayName = String(formData.get('displayName') ?? '').trim();
 
@@ -186,10 +192,13 @@ export async function joinRoomAction(_: RoomsActionState, formData: FormData): P
       if (error) return { error: 'No pudimos sumarte a la sala. Inténtalo otra vez en unos segundos.' };
     }
 
-    redirect(`/rooms/${room!.room_code}/lobby`);
+    redirectTo = `/rooms/${room!.room_code}/lobby`;
   } catch {
     return { error: 'Tuvimos un problema de conexión. Vuelve a intentarlo en un momento.' };
   }
+
+  if (!redirectTo) return { error: 'No pudimos abrir el lobby de la sala. Intenta nuevamente.' };
+  redirect(redirectTo);
 }
 
 

@@ -5,6 +5,8 @@ export const uxCopy = {
     registerCta: 'Crear cuenta local',
     loginCta: 'Entrar con cuenta',
     profileCta: 'Ir a mi perfil',
+    createRoomCta: 'Crear sala de juego',
+    joinRoomCta: 'Unirme a una sala',
   },
   auth: {
     registerTitle: 'Crea tu cuenta en Orbitas',
