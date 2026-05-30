@@ -27,6 +27,20 @@ export function LobbyRealtimeClient({ roomCode, inviteLink, initialRoom, initial
   }, [router, startState.redirectTo]);
 
   useEffect(() => {
+    setState({ room: initialRoom, participants: normalizeParticipants(initialParticipants) });
+  }, [initialParticipants, initialRoom]);
+
+  useEffect(() => {
+    if (state.room.status === 'in_game') router.push(`/rooms/${roomCode}/play`);
+    if (state.room.status === 'results') router.push(`/rooms/${roomCode}/results`);
+  }, [roomCode, router, state.room.status]);
+
+  useEffect(() => {
+    const snapshotInterval = window.setInterval(() => router.refresh(), 3000);
+    return () => window.clearInterval(snapshotInterval);
+  }, [router]);
+
+  useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setConnectionMessage('La sincronización en vivo no está configurada. La sala se creó, pero para ver cambios automáticos revisa las variables NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.');
