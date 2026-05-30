@@ -37,6 +37,8 @@ export function PlayRealtimeClient({ roomId, hostParticipantId, actorParticipant
       if (!matchRes.data?.current_round_id && roomRes.data?.status === 'in_game') router.refresh();
     };
 
+    const snapshotInterval = window.setInterval(() => router.refresh(), 3000);
+
     const channel = supabase
       .channel(`play:${roomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => router.refresh())
@@ -60,6 +62,7 @@ export function PlayRealtimeClient({ roomId, hostParticipantId, actorParticipant
       });
 
     return () => {
+      window.clearInterval(snapshotInterval);
       supabase.removeChannel(channel);
     };
   }, [hostParticipantId, roomId, router]);

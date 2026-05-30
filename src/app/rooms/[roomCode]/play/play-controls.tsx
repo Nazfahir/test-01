@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { advanceRoundAction, lockRoundAction, revealRoundAction, submitMostLikelyVoteAction, submitNoRepeatAnswerAction, submitWouldYouRatherChoiceAction } from '@/features/rooms/actions';
 import { Button } from '@/components/ui/Button';
 import type { RoundRevealPayload } from '@/features/rooms/reveal';
@@ -21,12 +22,19 @@ type Props = {
 };
 
 export function PlayControls({ roomId, matchId, roundId, roundStatus, gameType, question, options, isHost, hasSubmitted, participants, actorParticipantId, revealSnapshot }: Props) {
+  const router = useRouter();
   const [lockState, lockFormAction] = useActionState(lockRoundAction, {});
   const [revealState, revealFormAction] = useActionState(revealRoundAction, {});
   const [advanceState, advanceFormAction] = useActionState(advanceRoundAction, {});
   const [submitWyrState, submitWyrFormAction] = useActionState(submitWouldYouRatherChoiceAction, {});
   const [submitMostLikelyState, submitMostLikelyFormAction] = useActionState(submitMostLikelyVoteAction, {});
   const [submitNoRepeatState, submitNoRepeatFormAction] = useActionState(submitNoRepeatAnswerAction, {});
+
+  useEffect(() => {
+    if (lockState.ok || revealState.ok || advanceState.ok || submitWyrState.ok || submitMostLikelyState.ok || submitNoRepeatState.ok) {
+      router.refresh();
+    }
+  }, [advanceState.ok, lockState.ok, revealState.ok, router, submitMostLikelyState.ok, submitNoRepeatState.ok, submitWyrState.ok]);
 
   return (
     <div className="space-y-3">
