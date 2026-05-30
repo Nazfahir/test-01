@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { getServerSupabaseEnv, getServiceRoleKey } from '@/lib/env';
+import { getServerSupabaseEnv, getServiceRoleKey } from '@/lib/serverEnv';
 
 type CookieToSet = { name: string; value: string; options?: Record<string, unknown> };
 
