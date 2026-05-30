@@ -13,30 +13,9 @@ type PublicSupabaseEnv = {
   appUrl: string | undefined;
 };
 
-type PrivateEnvKey = typeof ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY;
-
-type PublicSupabaseEnv = {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  appUrl: string | undefined;
-};
-
 function readOptionalEnv(name: typeof ENV_KEYS.NEXT_PUBLIC_APP_URL): string | undefined {
   const value = process.env[name]?.trim();
   return value || undefined;
-}
-
-function readOptionalString(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value || undefined;
-}
-
-function readRequiredEnv(name: PublicEnvKey | PrivateEnvKey): string {
-  const value = process.env[name];
-
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-
-  return value;
 }
 
 export function getOptionalPublicEnv(): PublicSupabaseEnv | null {
@@ -81,36 +60,6 @@ export function getPublicEnv(): PublicSupabaseEnv {
     supabaseAnonKey,
     appUrl: readOptionalEnv(ENV_KEYS.NEXT_PUBLIC_APP_URL),
   };
-}
-
-export function getServerSupabaseEnv() {
-  const supabaseUrl =
-    readOptionalString(ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL) ?? readOptionalString(ENV_KEYS.SUPABASE_URL);
-  const supabaseAnonKey =
-    readOptionalString(ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY) ?? readOptionalString(ENV_KEYS.SUPABASE_ANON_KEY);
-
-  if (!supabaseUrl) {
-    throw new Error(
-      `Missing required environment variable "${ENV_KEYS.NEXT_PUBLIC_SUPABASE_URL}". ` +
-        'Add it to your .env.local before running Orbitas.',
-    );
-  }
-
-  if (!supabaseAnonKey) {
-    throw new Error(
-      `Missing required environment variable "${ENV_KEYS.NEXT_PUBLIC_SUPABASE_ANON_KEY}". ` +
-        'Add it to your .env.local before running Orbitas.',
-    );
-  }
-
-  return {
-    supabaseUrl,
-    supabaseAnonKey,
-  };
-}
-
-export function getServiceRoleKey() {
-  return readRequiredEnv(ENV_KEYS.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 export function validatePublicEnv() {
